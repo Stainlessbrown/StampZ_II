@@ -1,0 +1,48 @@
+name: Build StampZ Cross-Platform
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            ext: .exe
+          - os: macos-13
+            name: mac-intel
+            ext: ""
+          - os: ubuntu-latest
+            name: linux-x64
+            ext: ""
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pillow numpy
+    
+    - name: Build executable
+      run: |
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} main.py
+    
+    - name: Upload executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: StampZ_${{ matrix.name }}
+        path: dist/StampZ_${{ matrix.name }}${{ matrix.ext }}
