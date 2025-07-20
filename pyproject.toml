@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "StampZ"
+version = "1.53"
+description = "A tool for image processing and color conversion."
+authors = [
+  { name="Your Name", email="your.email@example.com" }
+]
+
+[dependencies]
+numpy = "==2.2.4"
+Pillow = "==11.1.0"
+odfpy = "==1.4.1"
+colorspacious = "==1.1.2"
+
