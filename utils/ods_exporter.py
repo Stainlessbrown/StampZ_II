@@ -458,18 +458,51 @@ class ODSExporter:
             if not os.path.exists(actual_path):
                 print(f"ERROR: File not found: {actual_path}")
                 return False
-                
-            # For Linux, use subprocess with soffice directly
-            subprocess.Popen(['soffice', '--calc', actual_path])
             
-            # Add a small delay to ensure LibreOffice has time to start
+            import sys
+            
+            if sys.platform == 'darwin':  # macOS
+                # Use macOS 'open' command which will open with default app
+                subprocess.Popen(['open', actual_path])
+                print(f"DEBUG: Opened file on macOS with 'open' command")
+            elif sys.platform.startswith('linux'):  # Linux
+                # Try different LibreOffice commands in order of preference
+                commands_to_try = [
+                    ['libreoffice', '--calc', actual_path],
+                    ['soffice', '--calc', actual_path],
+                    ['xdg-open', actual_path]  # Fallback to system default
+                ]
+                
+                success = False
+                for cmd in commands_to_try:
+                    try:
+                        subprocess.Popen(cmd)
+                        print(f"DEBUG: Successfully launched with command: {' '.join(cmd)}")
+                        success = True
+                        break
+                    except FileNotFoundError:
+                        print(f"DEBUG: Command not found: {' '.join(cmd)}")
+                        continue
+                
+                if not success:
+                    print(f"ERROR: Could not find LibreOffice or system open command")
+                    return False
+            elif sys.platform.startswith('win'):  # Windows
+                # Use Windows start command
+                subprocess.Popen(['start', actual_path], shell=True)
+                print(f"DEBUG: Opened file on Windows with 'start' command")
+            else:
+                print(f"WARNING: Unsupported platform: {sys.platform}")
+                return False
+            
+            # Add a small delay to ensure application has time to start
             import time
             time.sleep(1)
             
-            return True  # Return True since the command was successfully launched
+            return True
             
         except Exception as e:
-            print(f"Error opening file with LibreOffice: {e}")
+            print(f"Error opening file: {e}")
             return False
     
     def _bring_libreoffice_to_front(self):
