@@ -54,14 +54,8 @@ class ColorLibrary:
         self.library_name = library_name
         
         # Create database path in data/color_libraries/ directory
-        # Use STAMPZ_DATA_DIR environment variable if available (for packaged apps)
-        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
-        if stampz_data_dir:
-            library_dir = os.path.join(stampz_data_dir, "data", "color_libraries")
-        else:
-            # Fallback to relative path for development
-            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            library_dir = os.path.join(current_dir, "data", "color_libraries")
+        from .path_utils import get_color_libraries_dir
+        library_dir = get_color_libraries_dir()
         
         os.makedirs(library_dir, exist_ok=True)
         
@@ -70,7 +64,6 @@ class ColorLibrary:
         self.db_path = os.path.join(library_dir, f"{clean_name}_library.db")
         
         print(f"DEBUG: ColorLibrary init - library_name: {library_name}")
-        print(f"DEBUG: ColorLibrary init - STAMPZ_DATA_DIR: {stampz_data_dir}")
         print(f"DEBUG: ColorLibrary init - library_dir: {library_dir}")
         print(f"DEBUG: ColorLibrary init - db_path: {self.db_path}")
         

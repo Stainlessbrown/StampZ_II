@@ -17,12 +17,16 @@ from utils.recent_files import RecentFilesManager
 from utils.filename_manager import FilenameManager
 from utils.image_straightener import StraighteningTool
 from utils.ods_exporter import ODSExporter
+from utils.path_utils import ensure_data_directories
 
 logger = logging.getLogger(__name__)
 
 class StampZApp:
     """Main application window for StampZ."""
     def __init__(self, root: tk.Tk):
+        # Ensure data directories exist first
+        ensure_data_directories()
+        
         self.root = root
         self.root.title("StampZ")
         self._set_application_name()

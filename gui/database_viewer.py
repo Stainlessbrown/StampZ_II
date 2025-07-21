@@ -176,30 +176,15 @@ class DatabaseViewer:
     def _load_sample_sets(self):
         """Load available databases into the combobox based on selected data source."""
         try:
-            import sys
-            
-            # Use the same path detection logic as ColorAnalysisDB
-            if hasattr(sys, '_MEIPASS'):
-                # Running in PyInstaller bundle - use user data directory
-                if sys.platform.startswith('linux'):
-                    user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-                elif sys.platform == 'darwin':
-                    user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-                else:
-                    user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-                base_data_dir = os.path.join(user_data_dir, "data")
-            else:
-                # Running from source - use relative path
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                base_data_dir = os.path.join(current_dir, "data")
+            from utils.path_utils import get_color_analysis_dir, get_color_libraries_dir
             
             if self.data_source.get() == "color_analysis":
                 from utils.color_analysis_db import ColorAnalysisDB
-                data_dir = os.path.join(base_data_dir, "color_analysis")
+                data_dir = get_color_analysis_dir()
                 databases = ColorAnalysisDB.get_all_sample_set_databases(data_dir)
                 source_type = "sample sets"
             else:  # color_libraries
-                data_dir = os.path.join(base_data_dir, "color_libraries")
+                data_dir = get_color_libraries_dir()
                 if os.path.exists(data_dir):
                     # Color libraries have different naming - look for _library.db files
                     databases = []
@@ -351,21 +336,8 @@ class DatabaseViewer:
                 self.status_var.set(f"Loaded {len(self.measurements)} measurements from {self.current_sample_set}")
             
             else:  # color_libraries
-                import sys
-                
-                # Use the same path detection logic as loading
-                if hasattr(sys, '_MEIPASS'):
-                    # Running in PyInstaller bundle - use user data directory
-                    if sys.platform.startswith('linux'):
-                        user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-                    elif sys.platform == 'darwin':
-                        user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-                    else:
-                        user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-                    data_dir = os.path.join(user_data_dir, "data", "color_libraries")
-                else:
-                    # Running from source - use relative path
-                    data_dir = os.path.join(current_dir, "data", "color_libraries")
+                from utils.path_utils import get_color_libraries_dir
+                data_dir = get_color_libraries_dir()
                 
                 # Try different naming conventions for color libraries
                 db_path = None

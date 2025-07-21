@@ -256,14 +256,9 @@ class ColorLibraryManager:
     
     def _update_library_list(self):
         """Update the library selection combobox."""
-        # Use STAMPZ_DATA_DIR environment variable if available (for packaged apps)
-        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
-        if stampz_data_dir:
-            library_dir = os.path.join(stampz_data_dir, "data", "color_libraries")
-        else:
-            # Fallback to relative path for development
-            current_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            library_dir = os.path.join(current_dir, "data", "color_libraries")
+        # Use unified path resolution
+        from utils.path_utils import get_color_libraries_dir
+        library_dir = get_color_libraries_dir()
         
         try:
             # Ensure library directory exists
