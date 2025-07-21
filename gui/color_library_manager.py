@@ -265,14 +265,36 @@ class ColorLibraryManager:
             current_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
             library_dir = os.path.join(current_dir, "data", "color_libraries")
         
+        # Also check Application Support directory on macOS
+        app_support_dir = None
+        if os.name == 'posix':  # macOS/Linux
+            try:
+                home = os.path.expanduser("~")
+                app_support_dir = os.path.join(home, "Library", "Application Support", "StampZ", "data", "color_libraries")
+            except:
+                pass
+        
         try:
             # Ensure library directory exists
             os.makedirs(library_dir, exist_ok=True)
             
-            # Get all library files
-            library_files = [f for f in os.listdir(library_dir) if f.endswith("_library.db")]
+            # Collect library files from both locations
+            library_files = set()
             
-            # Always include basic_colors in the list
+            # Get library files from main directory
+            if os.path.exists(library_dir):
+                for f in os.listdir(library_dir):
+                    if f.endswith("_library.db"):
+                        library_files.add(f)
+            
+            # Get library files from Application Support directory (macOS)
+            if app_support_dir and os.path.exists(app_support_dir):
+                for f in os.listdir(app_support_dir):
+                    if f.endswith("_library.db"):
+                        library_files.add(f)
+            
+            # Convert to list and always include basic_colors
+            library_files = list(library_files)
             if "basic_colors_library.db" not in library_files:
                 library_files.append("basic_colors_library.db")
             

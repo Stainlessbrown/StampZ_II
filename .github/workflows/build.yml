@@ -18,6 +18,9 @@ jobs:
           - os: macos-13
             name: mac-intel
             ext: ""
+          - os: macos-latest
+            name: mac-arm
+            ext: ""
           - os: ubuntu-latest
             name: linux-x64
             ext: ""

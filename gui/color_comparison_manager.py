@@ -489,17 +489,45 @@ class ColorComparisonManager(tk.Frame):
     def _load_available_libraries(self):
         """Load available color libraries and populate dropdown."""
         try:
-            # Get path to color libraries directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            library_dir = os.path.join(current_dir, "..", "data", "color_libraries")
+            # Use STAMPZ_DATA_DIR environment variable if available (for packaged apps)
+            stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+            if stampz_data_dir:
+                library_dir = os.path.join(stampz_data_dir, "data", "color_libraries")
+            else:
+                # Fallback to relative path for development
+                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                library_dir = os.path.join(current_dir, "data", "color_libraries")
             
-            # Get list of library files
-            library_files = [f[:-11] for f in os.listdir(library_dir) 
-                           if f.endswith("_library.db") 
-                           and not f.lower().startswith("all_libraries")]
+            # Also check Application Support directory on macOS
+            app_support_dir = None
+            if os.name == 'posix':  # macOS/Linux
+                import subprocess
+                try:
+                    home = os.path.expanduser("~")
+                    app_support_dir = os.path.join(home, "Library", "Application Support", "StampZ", "data", "color_libraries")
+                except:
+                    pass
             
-            # Add 'All Libraries' option at the top
-            self.library_combo['values'] = ['All Libraries'] + sorted(library_files)
+            # Collect library files from both locations
+            library_files = set()
+            
+            # Check main library directory
+            if os.path.exists(library_dir):
+                for f in os.listdir(library_dir):
+                    if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
+                        library_files.add(f[:-11])  # Remove .db extension
+            
+            # Check Application Support directory (macOS)
+            if app_support_dir and os.path.exists(app_support_dir):
+                for f in os.listdir(app_support_dir):
+                    if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
+                        library_files.add(f[:-11])  # Remove .db extension
+            
+            # Convert to sorted list and add 'All Libraries' option at the top
+            library_list = sorted(list(library_files))
+            self.library_combo['values'] = ['All Libraries'] + library_list
+            
+            print(f"DEBUG: Loaded {len(library_list)} libraries for comparison: {library_list}")
             
         except Exception as e:
             print(f"Error loading libraries: {str(e)}")

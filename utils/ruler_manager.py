@@ -176,8 +176,9 @@ class RulerManager:
         image_height = self.canvas.original_image.height
         
         # Calculate visible range in Cartesian coordinates
-        visible_start = -image_offset[1] / image_scale
-        visible_end = (canvas_height - self.RULER_SIZE - image_offset[1]) / image_scale
+        # Adjust for the ruler offset to align with mouse coordinates
+        visible_start = -(image_offset[1] + self.RULER_SIZE) / image_scale
+        visible_end = (canvas_height - self.RULER_SIZE - image_offset[1] - self.RULER_SIZE) / image_scale
 
         # Ensure we include negative values and round to nearest step
         start_y = (int(visible_start / base_step) - 1) * base_step
