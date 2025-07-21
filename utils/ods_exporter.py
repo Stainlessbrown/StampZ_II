@@ -52,25 +52,18 @@ class ODSExporter:
         """
         self.sample_set_name = sample_set_name
         
-        # Use persistent user data directory instead of relative to executable
-        import sys
-        
-        if hasattr(sys, '_MEIPASS'):
-            # Running in PyInstaller bundle - use user data directory
-            if sys.platform.startswith('linux'):
-                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-            elif sys.platform == 'darwin':
-                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-            else:
-                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-            
-            self.coordinates_db_path = os.path.join(user_data_dir, "coordinates.db")
-            self.color_data_dir = os.path.join(user_data_dir, "data", "color_analysis")
+        # Use STAMPZ_DATA_DIR environment variable if available (consistent with ColorAnalysisDB)
+        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+        if stampz_data_dir:
+            self.coordinates_db_path = os.path.join(stampz_data_dir, "coordinates.db")
+            self.color_data_dir = os.path.join(stampz_data_dir, "data", "color_analysis")
+            print(f"DEBUG ODSExporter: Using STAMPZ_DATA_DIR: {stampz_data_dir}")
         else:
             # Running from source - use relative path
             current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.coordinates_db_path = os.path.join(current_dir, "data", "coordinates.db")
             self.color_data_dir = os.path.join(current_dir, "data", "color_analysis")
+            print(f"DEBUG ODSExporter: Using relative path from: {current_dir}")
             
         if not ODF_AVAILABLE:
             raise ImportError("odfpy library not available. Install with: pip install odfpy==1.4.1")
@@ -417,19 +410,10 @@ class ODSExporter:
         
         filename = f"{base_filename}.ods"
         
-        # Save to a persistent 'exports' directory in user data
-        import sys
-        
-        if hasattr(sys, '_MEIPASS'):
-            # Running in PyInstaller bundle - use user data directory
-            if sys.platform.startswith('linux'):
-                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-            elif sys.platform == 'darwin':
-                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-            else:
-                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-            
-            output_path = os.path.join(user_data_dir, "exports", filename)
+        # Save to exports directory using consistent path resolution
+        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+        if stampz_data_dir:
+            output_path = os.path.join(stampz_data_dir, "exports", filename)
         else:
             # Running from source - use relative path
             current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
