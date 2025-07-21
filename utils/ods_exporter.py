@@ -294,6 +294,9 @@ class ODSExporter:
     
     def create_ods_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
         """Create an ODS document with the color measurements."""
+        if not ODF_AVAILABLE:
+            raise RuntimeError("odfpy library not available. Cannot create ODS document.")
+            
         # Create new document
         doc = OpenDocumentSpreadsheet()
         

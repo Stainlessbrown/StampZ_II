@@ -35,11 +35,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller pillow numpy
+        pip install pyinstaller pillow numpy odfpy
     
     - name: Build executable
       run: |
-        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} main.py
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
     
     - name: Upload executable
       uses: actions/upload-artifact@v4
