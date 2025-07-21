@@ -60,18 +60,23 @@ jobs:
         iconutil -c icns StampZ.iconset
         ls -la StampZ.icns
     
-    - name: Build executable
+    - name: Build macOS executable
+      if: startsWith(matrix.os, 'macos')
       run: |
-        if [[ "${{ matrix.os }}" == *"macos"* ]]; then
-          # macOS: Create .app bundle with icon
-          python -m PyInstaller --onedir --windowed --name StampZ_${{ matrix.name }} --icon=StampZ.icns --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
-        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          # Windows: Create single executable with icon
-          python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --icon=resources/StampZ.ico --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
-        else
-          # Linux: Create single executable
-          python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
-        fi
+        # macOS: Create .app bundle with icon
+        python -m PyInstaller --onedir --windowed --name StampZ_${{ matrix.name }} --icon=StampZ.icns --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
+        
+    - name: Build Windows executable
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Windows: Create single executable with icon
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --icon=resources/StampZ.ico --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
+        
+    - name: Build Linux executable
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Linux: Create single executable
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
     
     - name: Create macOS app bundle zip
       if: startsWith(matrix.os, 'macos')
