@@ -175,20 +175,27 @@ class RulerManager:
             
         image_height = self.canvas.original_image.height
         
-        # Calculate visible range in Cartesian coordinates
-        # Adjust for the ruler offset to align with mouse coordinates
-        visible_start = -(image_offset[1] + self.RULER_SIZE) / image_scale
-        visible_end = (canvas_height - self.RULER_SIZE - image_offset[1] - self.RULER_SIZE) / image_scale
-
+        # Calculate visible range in Cartesian coordinates  
+        # Convert screen coordinates to image coordinates properly
+        screen_top = 0
+        screen_bottom = canvas_height - self.RULER_SIZE
+        
+        # Convert screen Y to image Y using the same transformation as canvas_core.py
+        image_top = image_height - ((screen_top - image_offset[1]) / image_scale)
+        image_bottom = image_height - ((screen_bottom - image_offset[1]) / image_scale)
+        
         # Ensure we include negative values and round to nearest step
-        start_y = (int(visible_start / base_step) - 1) * base_step
-        end_y = (int(visible_end / base_step) + 1) * base_step
+        start_y = (int(min(image_bottom, image_top) / base_step) - 1) * base_step
+        end_y = (int(max(image_bottom, image_top) / base_step) + 1) * base_step
 
         # Draw ticks from bottom to top
         y = start_y
         while y <= end_y:
-            # Convert from image to screen coordinates (consider zoom)
-            y_screen = canvas_height - self.RULER_SIZE - (y * image_scale)
+            # Convert from mathematical image coordinates to screen coordinates using canvas transformation
+            # This matches the transformation in canvas_core.py image_to_screen_coords
+            image_relative_y = image_height - y
+            screen_relative_y = image_relative_y * image_scale
+            y_screen = int(screen_relative_y + image_offset[1])
             
             if y * image_scale < 5:  # Ignore tiny scales for clarity
                 y += base_step
@@ -234,15 +241,17 @@ class RulerManager:
         left_image = (self.RULER_SIZE - image_offset[0]) / image_scale
         right_image = (canvas_width - image_offset[0]) / image_scale
         
-        # Convert to Cartesian coordinates (y=0 at bottom)
-        bottom_image = -image_offset[1] / image_scale  # Allow negative values
-        top_image = (canvas_height - self.RULER_SIZE - image_offset[1]) / image_scale
+        # Convert screen coordinates to image coordinates properly for Y axis
+        screen_top = 0  
+        screen_bottom = canvas_height - self.RULER_SIZE
+        image_top = image_height - ((screen_top - image_offset[1]) / image_scale)
+        image_bottom = image_height - ((screen_bottom - image_offset[1]) / image_scale)
 
         # Calculate grid line positions
         start_x = (int(left_image / base_step) - 1) * base_step
         end_x = (int(right_image / base_step) + 1) * base_step
-        start_y = (int(min(top_image, bottom_image) / base_step) - 1) * base_step
-        end_y = (int(max(top_image, bottom_image) / base_step) + 1) * base_step
+        start_y = (int(min(image_bottom, image_top) / base_step) - 1) * base_step
+        end_y = (int(max(image_bottom, image_top) / base_step) + 1) * base_step
 
         # Draw vertical grid lines
         for x in range(start_x, end_x + base_step, base_step):
@@ -264,9 +273,10 @@ class RulerManager:
 
         # Draw horizontal grid lines
         for y in range(start_y, end_y + base_step, base_step):
-            # Convert Cartesian y coordinate to screen coordinate
-            # For Cartesian coordinates, we need to invert the y-axis
-            y_screen = canvas_height - self.RULER_SIZE - (y * image_scale)
+            # Convert mathematical image coordinates to screen coordinates using same method as ruler
+            image_relative_y = image_height - y
+            screen_relative_y = image_relative_y * image_scale
+            y_screen = int(screen_relative_y + image_offset[1])
             
             # Skip if outside visible area
             if y_screen < self.RULER_SIZE or y_screen > canvas_height - self.RULER_SIZE:

@@ -489,52 +489,84 @@ class ColorComparisonManager(tk.Frame):
     def _load_available_libraries(self):
         """Load available color libraries and populate dropdown."""
         try:
-            # Use STAMPZ_DATA_DIR environment variable if available (for packaged apps)
-            stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
-            if stampz_data_dir:
-                library_dir = os.path.join(stampz_data_dir, "data", "color_libraries")
-            else:
-                # Fallback to relative path for development
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                library_dir = os.path.join(current_dir, "data", "color_libraries")
+            # Use the same logic as main.py to find libraries
+            library_files = set()  # Use set to avoid duplicates
             
-            # Also check Application Support directory on macOS
-            app_support_dir = None
-            if os.name == 'posix':  # macOS/Linux
-                import subprocess
-                try:
-                    home = os.path.expanduser("~")
-                    app_support_dir = os.path.join(home, "Library", "Application Support", "StampZ", "data", "color_libraries")
-                except:
-                    pass
+            # Get directories to check
+            library_dirs = self._get_library_directories()
             
-            # Collect library files from both locations
-            library_files = set()
-            
-            # Check main library directory
-            if os.path.exists(library_dir):
-                for f in os.listdir(library_dir):
+            for library_dir in library_dirs:
+                print(f"DEBUG: Looking for libraries in: {library_dir}")
+                
+                if not os.path.exists(library_dir):
+                    print(f"DEBUG: Library directory does not exist: {library_dir}")
+                    continue
+                
+                # Get list of all files in directory for debugging
+                all_files = os.listdir(library_dir)
+                print(f"DEBUG: All files in library directory: {all_files}")
+                
+                # Get list of library files
+                for f in all_files:
                     if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
-                        library_files.add(f[:-11])  # Remove .db extension
+                        library_name = f[:-11]  # Remove '_library.db' suffix
+                        library_files.add(library_name)
+                        print(f"DEBUG: Found library: {library_name} in {library_dir}")
             
-            # Check Application Support directory (macOS)
-            if app_support_dir and os.path.exists(app_support_dir):
-                for f in os.listdir(app_support_dir):
-                    if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
-                        library_files.add(f[:-11])  # Remove .db extension
-            
-            # Convert to sorted list and add 'All Libraries' option at the top
+            # Convert to sorted list
             library_list = sorted(list(library_files))
-            self.library_combo['values'] = ['All Libraries'] + library_list
+            print(f"DEBUG: Found {len(library_list)} total libraries: {library_list}")
             
-            print(f"DEBUG: Loaded {len(library_list)} libraries for comparison: {library_list}")
+            # Add 'All Libraries' option at the top
+            self.library_combo['values'] = ['All Libraries'] + library_list
+            print(f"DEBUG: Set combo values to: {self.library_combo['values']}")
             
         except Exception as e:
             print(f"Error loading libraries: {str(e)}")
+            import traceback
+            traceback.print_exc()
             messagebox.showerror(
                 "Library Error",
                 f"Failed to load color libraries:\n\n{str(e)}"
             )
+    
+    def _get_library_directories(self):
+        """Get list of directories to check for color libraries.
+        
+        Returns:
+            List of directory paths to search for libraries
+        """
+        directories = []
+        
+        # Check if running as PyInstaller bundle
+        if hasattr(sys, '_MEIPASS'):
+            # Running in PyInstaller bundle - use user data directory
+            if sys.platform.startswith('linux'):
+                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
+            elif sys.platform == 'darwin':
+                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+            else:
+                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
+            directories.append(os.path.join(user_data_dir, "data", "color_libraries"))
+            
+            # Also check bundled libraries
+            bundled_dir = os.path.join(sys._MEIPASS, "data", "color_libraries")
+            directories.append(bundled_dir)
+        else:
+            # Running from source - use relative path
+            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            directories.append(os.path.join(current_dir, "data", "color_libraries"))
+            
+            # Also check user data directory in case libraries were added while running from source
+            if sys.platform.startswith('linux'):
+                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
+            elif sys.platform == 'darwin':
+                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+            else:
+                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
+            directories.append(os.path.join(user_data_dir, "data", "color_libraries"))
+        
+        return directories
     
     def _on_library_selected(self, event=None):
         """Handle library selection change."""
@@ -546,18 +578,31 @@ class ColorComparisonManager(tk.Frame):
             print(f"Loading library: {library_name}")
             
             if library_name == "All Libraries":
-                # Get list of all library files
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                library_dir = os.path.join(current_dir, "..", "data", "color_libraries")
-                library_files = [f[:-11] for f in os.listdir(library_dir) 
-                               if f.endswith("_library.db")]
+                # Get list of all library files from all directories
+                library_files = set()
+                library_dirs = self._get_library_directories()
                 
-                # Load the first library as primary
-                self.library = ColorLibrary(library_files[0])
+                for library_dir in library_dirs:
+                    if os.path.exists(library_dir):
+                        for f in os.listdir(library_dir):
+                            if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
+                                library_name_clean = f[:-11]
+                                library_files.add(library_name_clean)
                 
-                # Load all libraries for comparison
-                self.all_libraries = [ColorLibrary(lib) for lib in library_files]
-                print(f"Loaded {len(self.all_libraries)} libraries")
+                library_list = sorted(list(library_files))
+                print(f"Found libraries for 'All Libraries': {library_list}")
+                
+                if library_list:
+                    # Load the first library as primary
+                    self.library = ColorLibrary(library_list[0])
+                    
+                    # Load all libraries for comparison
+                    self.all_libraries = [ColorLibrary(lib) for lib in library_list]
+                    print(f"Loaded {len(self.all_libraries)} libraries for comparison")
+                else:
+                    print("No libraries found for 'All Libraries' option")
+                    self.library = None
+                    self.all_libraries = []
             else:
                 self.library = ColorLibrary(library_name)
                 self.all_libraries = None

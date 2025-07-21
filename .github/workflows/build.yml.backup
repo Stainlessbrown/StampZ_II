@@ -1,0 +1,95 @@
+name: Build StampZ Cross-Platform
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            ext: .exe
+          - os: macos-13
+            name: mac-intel
+            ext: ""
+          - os: macos-latest
+            name: mac-arm
+            ext: ""
+          - os: ubuntu-latest
+            name: linux-x64
+            ext: ""
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pillow numpy odfpy
+        
+    - name: Create macOS icon (icns)
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        # Create icns file from PNG for macOS
+        mkdir -p StampZ.iconset
+        # Use sips (built into macOS) to create different sizes
+        sips -z 16 16 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16.png"
+        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16@2x.png"
+        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32.png"
+        sips -z 64 64 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32@2x.png"
+        sips -z 128 128 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128.png"
+        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128@2x.png"
+        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256.png"
+        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256@2x.png"
+        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512.png"
+        sips -z 1024 1024 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png" 2>/dev/null || sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png"
+        # Create the icns file
+        iconutil -c icns StampZ.iconset
+        ls -la StampZ.icns
+    
+    - name: Build executable
+      run: |
+        if [[ "${{ matrix.os }}" == *"macos"* ]]; then
+          # macOS: Create .app bundle with icon
+          python -m PyInstaller --onedir --windowed --name StampZ_${{ matrix.name }} --icon=StampZ.icns --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          # Windows: Create single executable with icon
+          python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --icon=resources/StampZ.ico --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
+        else
+          # Linux: Create single executable
+          python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --collect-all odfpy main.py
+        fi
+    
+    - name: Create macOS app bundle zip
+      if: startsWith(matrix.os, 'macos')
+      run: |
+        cd dist
+        zip -r StampZ_${{ matrix.name }}.zip StampZ_${{ matrix.name }}.app
+        ls -la StampZ_${{ matrix.name }}.zip
+        
+    - name: Upload macOS app bundle
+      if: startsWith(matrix.os, 'macos')
+      uses: actions/upload-artifact@v4
+      with:
+        name: StampZ_${{ matrix.name }}
+        path: dist/StampZ_${{ matrix.name }}.zip
+        
+    - name: Upload Windows/Linux executable
+      if: "!startsWith(matrix.os, 'macos')"
+      uses: actions/upload-artifact@v4
+      with:
+        name: StampZ_${{ matrix.name }}
+        path: dist/StampZ_${{ matrix.name }}${{ matrix.ext }}
