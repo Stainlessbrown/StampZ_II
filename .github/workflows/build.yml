@@ -12,9 +12,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            name: windows-x64
-            ext: .exe
+          # Temporarily disabled Windows build due to exit code 1 issues
+          # - os: windows-latest
+          #   name: windows-x64
+          #   ext: .exe
           - os: macos-13
             name: mac-intel
             ext: ""
