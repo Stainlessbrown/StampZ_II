@@ -60,64 +60,75 @@ jobs:
         iconutil -c icns StampZ.iconset
         ls -la StampZ.icns
     
-    - name: Verify spec file
+    - name: Verify environment
       run: |
-        echo "Verifying spec file exists..."
-        ls -la stampz.spec
         echo "Current directory contents:"
         ls -la
         echo "Python version:"
         python --version
         echo "PyInstaller version:"
         python -m PyInstaller --version
+        echo "Required files check:"
+        ls -la main.py requirements.txt runtime_hook.py resources/
         
-    - name: Build with PyInstaller
+    - name: Build macOS executable
+      if: startsWith(matrix.os, 'macos')
       run: |
-        # Use spec file for consistent cross-platform builds
-        echo "Starting PyInstaller build..."
-        python -m PyInstaller stampz.spec --distpath dist --workpath build --specpath . --log-level=INFO
-        echo "Build completed. Checking dist directory:"
+        # macOS: Create .app bundle with icon
+        python -m PyInstaller --onedir --windowed --name StampZ_${{ matrix.name }} \
+          --icon=StampZ.icns \
+          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
+          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
+          --collect-all odfpy --add-data "resources:resources" --add-data "data:data" \
+          --runtime-hook runtime_hook.py main.py
+        echo "macOS build completed. Checking dist directory:"
         ls -la dist/
         
-    - name: Rename output for platform
+    - name: Build Windows executable
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Windows: Create single executable with icon
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} \
+          --icon=resources/StampZ.ico \
+          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
+          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
+          --collect-all odfpy --add-data "resources;resources" --add-data "data;data" \
+          --runtime-hook runtime_hook.py main.py
+        echo "Windows build completed. Checking dist directory:"
+        ls -la dist/
+        
+    - name: Build Linux executable
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Linux: Create single executable
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} \
+          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
+          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
+          --collect-all odfpy --add-data "resources:resources" --add-data "data:data" \
+          --runtime-hook runtime_hook.py main.py
+        echo "Linux build completed. Checking dist directory:"
+        ls -la dist/
+        
+    - name: Package output for platform
       run: |
         cd dist
         echo "Current dist contents:"
         ls -la
         if [ "${{ runner.os }}" = "macOS" ]; then
-          # macOS: Rename app bundle and create zip
-          if [ -d "StampZ.app" ]; then
-            mv StampZ.app StampZ_${{ matrix.name }}.app
+          # macOS: Create zip of the .app bundle (already named correctly)
+          if [ -d "StampZ_${{ matrix.name }}.app" ]; then
             zip -r StampZ_${{ matrix.name }}.zip StampZ_${{ matrix.name }}.app
             echo "Created macOS app bundle: StampZ_${{ matrix.name }}.zip"
             ls -la StampZ_${{ matrix.name }}.zip
           else
-            echo "ERROR: StampZ.app not found!"
-            ls -la
-            exit 1
-          fi
-        elif [ "${{ runner.os }}" = "Windows" ]; then
-          # Windows: Rename executable
-          if [ -f "StampZ.exe" ]; then
-            mv StampZ.exe StampZ_${{ matrix.name }}.exe
-            echo "Created Windows executable: StampZ_${{ matrix.name }}.exe"
-            ls -la StampZ_${{ matrix.name }}.exe
-          else
-            echo "ERROR: StampZ.exe not found!"
+            echo "ERROR: StampZ_${{ matrix.name }}.app not found!"
             ls -la
             exit 1
           fi
         else
-          # Linux: Rename executable
-          if [ -f "StampZ" ]; then
-            mv StampZ StampZ_${{ matrix.name }}
-            echo "Created Linux executable: StampZ_${{ matrix.name }}"
-            ls -la StampZ_${{ matrix.name }}
-          else
-            echo "ERROR: StampZ executable not found!"
-            ls -la
-            exit 1
-          fi
+          # Windows/Linux: Files are already correctly named
+          echo "Files already correctly named:"
+          ls -la StampZ_${{ matrix.name }}${{ matrix.ext }}
         fi
     
     - name: Upload macOS app bundle

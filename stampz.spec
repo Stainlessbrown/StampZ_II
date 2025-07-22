@@ -2,14 +2,15 @@
 import sys
 import os
 from PyInstaller.utils.hooks import collect_all
-from PyInstaller.utils.hooks import collect_data_files
 
-# Collect all odfpy data files and imports
-datas, binaries, hiddenimports = collect_all('odfpy')
+# Safely collect odfpy data files and imports
+try:
+    datas, binaries, hiddenimports = collect_all('odfpy')
+except Exception:
+    datas, binaries, hiddenimports = [], [], []
 
 # Add additional hidden imports
 hiddenimports += [
-    'PIL._tkinter_finder',
     'PIL.Image',
     'PIL.ImageTk',
     'tkinter.filedialog',
@@ -28,25 +29,22 @@ hiddenimports += [
 # Platform specific settings
 if sys.platform == 'darwin':
     # macOS
-    icon = 'StampZ.icns'
+    icon_path = 'StampZ.icns' if os.path.exists('StampZ.icns') else None
     onefile = False  # Use --onedir for app bundles
-    windowed = True
 elif sys.platform == 'win32':
     # Windows
-    icon = 'resources/StampZ.ico'
+    icon_path = 'resources/StampZ.ico' if os.path.exists('resources/StampZ.ico') else None
     onefile = True
-    windowed = True
 else:
     # Linux
-    icon = None
+    icon_path = None
     onefile = True
-    windowed = True
 
-# Collect data files
-datas += [
-    ('resources', 'resources'),
-    ('data', 'data'),
-]
+# Collect data files - only if they exist
+if os.path.exists('resources'):
+    datas += [('resources', 'resources')]
+if os.path.exists('data'):
+    datas += [('data', 'data')]
 
 a = Analysis(
     ['main.py'],
@@ -84,7 +82,7 @@ if onefile:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=icon,
+        icon=icon_path,
     )
 else:
     exe = EXE(
@@ -103,7 +101,7 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=icon,
+        icon=icon_path,
     )
     
     coll = COLLECT(
@@ -121,7 +119,7 @@ else:
         app = BUNDLE(
             coll,
             name='StampZ.app',
-            icon=icon,
+            icon=icon_path,
             bundle_identifier='com.stainlessbrown.stampz',
             version='1.53',
         )
