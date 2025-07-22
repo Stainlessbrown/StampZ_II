@@ -1,0 +1,8 @@
+# Core application dependencies
+numpy==2.2.4
+Pillow==11.1.0
+odfpy==1.4.1
+colorspacious==1.1.2
+
+# Build dependencies
+pyinstaller==6.3.0

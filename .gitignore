@@ -1,1 +1,39 @@
 .DS_Store
+
+# PyInstaller build artifacts
+build/
+dist/
+# Allow stampz.spec to be tracked
+!stampz.spec
+*.icns
+*.iconset/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
