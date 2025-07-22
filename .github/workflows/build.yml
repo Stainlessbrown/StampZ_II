@@ -76,17 +76,19 @@ jobs:
         
     - name: Verify environment (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: |
-        echo "Current directory contents:"
-        dir
-        echo "Python version:"
+        Write-Host "Current directory contents:"
+        Get-ChildItem
+        Write-Host "Python version:"
         python --version
-        echo "PyInstaller version:"
+        Write-Host "PyInstaller version:"
         python -m PyInstaller --version
-        echo "Required files check:"
-        dir main.py requirements.txt runtime_hook.py
-        dir resources
-        
+        Write-Host "Required files check:"
+        Write-Host "main.py exists: $(Test-Path main.py)"
+        Write-Host "requirements.txt exists: $(Test-Path requirements.txt)"
+        Write-Host "runtime_hook.py exists: $(Test-Path runtime_hook.py)"
+        Get-ChildItem resources
     - name: Build macOS executable
       if: startsWith(matrix.os, 'macos')
       run: |

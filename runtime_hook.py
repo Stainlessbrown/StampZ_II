@@ -6,7 +6,9 @@ def create_app_support_dir():
         # Running in a PyInstaller bundle
         if sys.platform == 'darwin':  # macOS
             app_support = os.path.expanduser('~/Library/Application Support/StampZ')
-        else:  # Linux
+        elif sys.platform.startswith('win'):  # Windows
+            app_support = os.path.expanduser('~/AppData/Local/StampZ')
+        else:  # Linux and other Unix-like systems
             app_support = os.path.expanduser('~/.local/share/StampZ')
             
         if not os.path.exists(app_support):
