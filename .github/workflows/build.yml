@@ -60,7 +60,8 @@ jobs:
         iconutil -c icns StampZ.iconset
         ls -la StampZ.icns
     
-    - name: Verify environment
+    - name: Verify environment (Unix)
+      if: runner.os != 'Windows'
       run: |
         echo "Current directory contents:"
         ls -la
@@ -70,6 +71,19 @@ jobs:
         python -m PyInstaller --version
         echo "Required files check:"
         ls -la main.py requirements.txt runtime_hook.py resources/
+        
+    - name: Verify environment (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        echo "Current directory contents:"
+        dir
+        echo "Python version:"
+        python --version
+        echo "PyInstaller version:"
+        python -m PyInstaller --version
+        echo "Required files check:"
+        dir main.py requirements.txt runtime_hook.py
+        dir resources
         
     - name: Build macOS executable
       if: startsWith(matrix.os, 'macos')
@@ -88,14 +102,9 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: |
         # Windows: Create single executable with icon
-        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} \
-          --icon=resources/StampZ.ico \
-          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
-          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
-          --collect-all odfpy --add-data "resources;resources" --add-data "data;data" \
-          --runtime-hook runtime_hook.py main.py
+        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} --icon=resources/StampZ.ico --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious --collect-all odfpy --add-data "resources;resources" --add-data "data;data" --runtime-hook runtime_hook.py main.py
         echo "Windows build completed. Checking dist directory:"
-        ls -la dist/
+        dir dist
         
     - name: Build Linux executable
       if: matrix.os == 'ubuntu-latest'
@@ -109,27 +118,40 @@ jobs:
         echo "Linux build completed. Checking dist directory:"
         ls -la dist/
         
-    - name: Package output for platform
+    - name: Package macOS output
+      if: startsWith(matrix.os, 'macos')
       run: |
         cd dist
         echo "Current dist contents:"
         ls -la
-        if [ "${{ runner.os }}" = "macOS" ]; then
-          # macOS: Create zip of the .app bundle (already named correctly)
-          if [ -d "StampZ_${{ matrix.name }}.app" ]; then
-            zip -r StampZ_${{ matrix.name }}.zip StampZ_${{ matrix.name }}.app
-            echo "Created macOS app bundle: StampZ_${{ matrix.name }}.zip"
-            ls -la StampZ_${{ matrix.name }}.zip
-          else
-            echo "ERROR: StampZ_${{ matrix.name }}.app not found!"
-            ls -la
-            exit 1
-          fi
+        # macOS: Create zip of the .app bundle (already named correctly)
+        if [ -d "StampZ_${{ matrix.name }}.app" ]; then
+          zip -r StampZ_${{ matrix.name }}.zip StampZ_${{ matrix.name }}.app
+          echo "Created macOS app bundle: StampZ_${{ matrix.name }}.zip"
+          ls -la StampZ_${{ matrix.name }}.zip
         else
-          # Windows/Linux: Files are already correctly named
-          echo "Files already correctly named:"
-          ls -la StampZ_${{ matrix.name }}${{ matrix.ext }}
+          echo "ERROR: StampZ_${{ matrix.name }}.app not found!"
+          ls -la
+          exit 1
         fi
+        
+    - name: Package Windows output
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd dist
+        echo "Current dist contents:"
+        dir
+        echo "Files already correctly named:"
+        dir StampZ_${{ matrix.name }}.exe
+        
+    - name: Package Linux output
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd dist
+        echo "Current dist contents:"
+        ls -la
+        echo "Files already correctly named:"
+        ls -la StampZ_${{ matrix.name }}
     
     - name: Upload macOS app bundle
       if: startsWith(matrix.os, 'macos')
