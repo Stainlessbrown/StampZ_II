@@ -64,6 +64,15 @@ class ODSExporter:
             self.coordinates_db_path = os.path.join(current_dir, "data", "coordinates.db")
             self.color_data_dir = os.path.join(current_dir, "data", "color_analysis")
             print(f"DEBUG ODSExporter: Using relative path from: {current_dir}")
+        
+        # Initialize preferences manager for export settings
+        try:
+            from .user_preferences import get_preferences_manager
+            self.prefs_manager = get_preferences_manager()
+            print(f"DEBUG ODSExporter: Initialized preferences manager")
+        except ImportError as e:
+            print(f"DEBUG ODSExporter: Could not load preferences manager: {e}")
+            self.prefs_manager = None
             
         if not ODF_AVAILABLE:
             raise ImportError("odfpy library not available. Install with: pip install odfpy==1.4.1")
@@ -159,13 +168,24 @@ class ODSExporter:
                         image_basename = os.path.splitext(os.path.basename(measurement['image_name']))[0]
                         data_id = f"{image_basename}_{sample_set_name}_#{measurement['coordinate_point']}"
                         
-                        # Get coordinate details for this point
+                        # Get coordinate details - FIRST try from the measurement itself (has actual values)
                         coord_point = measurement['coordinate_point']
-                        coord_details = coordinate_info.get(coord_point, {
-                            'shape': 'unknown',
-                            'size': 'unknown',
-                            'anchor': 'unknown'
-                        })
+                        
+                        # Try to get sample info from the measurement data itself
+                        coord_details = {
+                            'shape': measurement.get('sample_type', 'unknown'),
+                            'size': measurement.get('sample_size', 'unknown'),
+                            'anchor': measurement.get('sample_anchor', 'unknown')
+                        }
+                        
+                        # If we don't have sample info in the measurement, fall back to coordinate template
+                        if coord_details['shape'] == 'unknown' or not coord_details['shape']:
+                            template_details = coordinate_info.get(coord_point, {})
+                            coord_details = {
+                                'shape': template_details.get('shape', 'unknown'),
+                                'size': template_details.get('size', 'unknown'),
+                                'anchor': template_details.get('anchor', 'unknown')
+                            }
                         
                         measurements.append(ColorMeasurement(
                             data_id=data_id,
@@ -395,33 +415,52 @@ class ODSExporter:
             return False
     
     def export_to_sample_set_file(self, base_filename: str = None) -> str:
-        """Export to a single file per sample set (no timestamp).
+        """Export to a single file per sample set using user preferences.
         
         Args:
             base_filename: Optional base filename. If None, uses sample set name or default
         """
-        # Determine the base filename
-        if base_filename is None:
-            if self.sample_set_name:
-                base_filename = self.sample_set_name
+        try:
+            # Use preferences for export directory and filename
+            if self.prefs_manager:
+                export_dir = self.prefs_manager.get_export_directory()
+                filename = self.prefs_manager.get_export_filename(
+                    sample_set_name=self.sample_set_name or base_filename,
+                    extension=".ods"
+                )
+                output_path = os.path.join(export_dir, filename)
+                print(f"DEBUG ODSExporter: Using preferences - directory: {export_dir}, filename: {filename}")
             else:
-                # Use a default name for the current export
-                base_filename = "stampz_color_data"
-        
-        filename = f"{base_filename}.ods"
-        
-        # Save to exports directory using consistent path resolution
-        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
-        if stampz_data_dir:
-            output_path = os.path.join(stampz_data_dir, "exports", filename)
-        else:
-            # Running from source - use relative path
-            current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            output_path = os.path.join(current_dir, "exports", filename)
-        
-        if self.export_to_ods(output_path):
-            return output_path
-        return None
+                # Fallback to old method if preferences not available
+                print(f"DEBUG ODSExporter: Preferences not available, using fallback method")
+                
+                # Determine the base filename
+                if base_filename is None:
+                    if self.sample_set_name:
+                        base_filename = self.sample_set_name
+                    else:
+                        # Use a default name for the current export
+                        base_filename = "stampz_color_data"
+                
+                filename = f"{base_filename}.ods"
+                
+                # Save to exports directory using consistent path resolution
+                stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+                if stampz_data_dir:
+                    output_path = os.path.join(stampz_data_dir, "exports", filename)
+                else:
+                    # Running from source - use relative path
+                    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    output_path = os.path.join(current_dir, "exports", filename)
+            
+            if self.export_to_ods(output_path):
+                self.last_saved_file = output_path  # Store for potential opening
+                return output_path
+            return None
+            
+        except Exception as e:
+            print(f"DEBUG ODSExporter: Error in export_to_sample_set_file: {e}")
+            return None
     
     def export_with_timestamp(self, base_filename: str = None) -> str:
         """Export with a timestamped filename (legacy method for compatibility).
@@ -503,7 +542,7 @@ class ODSExporter:
             print(f"DEBUG: Failed to bring LibreOffice to front: {e}")
     
     def export_and_open(self, output_path: str = None) -> bool:
-        """Export to ODS and automatically open in LibreOffice Calc."""
+        """Export to ODS and conditionally open based on user preferences."""
         if output_path is None:
             output_path = self.export_with_timestamp()
         else:
@@ -512,7 +551,17 @@ class ODSExporter:
                 return False
         
         if output_path:
-            return self.open_file_with_default_app(output_path)
+            # Check user preferences for auto-opening
+            should_auto_open = True  # Default behavior
+            if self.prefs_manager:
+                should_auto_open = self.prefs_manager.preferences.export_prefs.auto_open_after_export
+                print(f"DEBUG ODSExporter: Auto-open preference: {should_auto_open}")
+            
+            if should_auto_open:
+                return self.open_file_with_default_app(output_path)
+            else:
+                print(f"DEBUG ODSExporter: Auto-open disabled, file saved to: {output_path}")
+                return True  # Export was successful, just didn't open
         return False
     
     def get_latest_export_file(self) -> str:

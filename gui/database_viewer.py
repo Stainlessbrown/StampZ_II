@@ -207,7 +207,13 @@ class DatabaseViewer:
                 self.sample_set_combo.set(databases[0])
                 self._on_sample_set_changed(None)  # Load first database
             else:
-                self.status_var.set(f"No {source_type} found in database")
+                # Clear the dropdown and show appropriate message
+                self.sample_set_combo["values"] = []
+                self.sample_set_combo.set("")
+                self.current_sample_set = None
+                # Clear any existing data in the tree
+                self.tree.delete(*self.tree.get_children())
+                self.status_var.set(f"No {source_type} found. Please run color analysis first.")
         
         except Exception as e:
             print(f"DEBUG: Error loading sample sets: {str(e)}")

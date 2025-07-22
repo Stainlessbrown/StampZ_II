@@ -4,6 +4,8 @@ import sys
 import shutil
 from pathlib import Path
 import logging
+from datetime import datetime
+import json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +43,226 @@ def copy_directory_contents(src_dir: Path, dest_dir: Path):
     except Exception as e:
         logger.error(f"Error copying directory contents from {src_dir} to {dest_dir}: {e}")
 
+def create_backup(user_data_dir: Path) -> bool:
+    """Create a timestamped backup of critical user data.
+    
+    Args:
+        user_data_dir: Path to user data directory
+        
+    Returns:
+        bool: True if backup was successful
+    """
+    try:
+        # Create backups directory
+        backups_dir = user_data_dir / 'backups'
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create timestamp for this backup
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_dir = backups_dir / f'backup_{timestamp}'
+        
+        # Critical directories to backup
+        critical_dirs = ['data']
+        backup_created = False
+        
+        for dir_name in critical_dirs:
+            source_dir = user_data_dir / dir_name
+            if source_dir.exists() and any(source_dir.iterdir()):
+                backup_subdir = backup_dir / dir_name
+                backup_subdir.mkdir(parents=True, exist_ok=True)
+                
+                logger.info(f"Creating backup: {source_dir} -> {backup_subdir}")
+                copy_directory_contents(source_dir, backup_subdir)
+                backup_created = True
+        
+        if backup_created:
+            # Create backup metadata
+            metadata = {
+                'timestamp': timestamp,
+                'created': datetime.now().isoformat(),
+                'directories': critical_dirs,
+                'platform': sys.platform
+            }
+            
+            metadata_file = backup_dir / 'backup_info.json'
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            logger.info(f"Backup created successfully: {backup_dir}")
+            return True
+        else:
+            logger.info("No data found to backup")
+            # Remove empty backup directory
+            if backup_dir.exists():
+                backup_dir.rmdir()
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error creating backup: {e}")
+        return False
+
+def get_latest_backup(user_data_dir: Path) -> Path:
+    """Get the path to the most recent backup.
+    
+    Args:
+        user_data_dir: Path to user data directory
+        
+    Returns:
+        Path: Path to latest backup directory, or None if no backups exist
+    """
+    try:
+        backups_dir = user_data_dir / 'backups'
+        if not backups_dir.exists():
+            return None
+            
+        backup_dirs = [d for d in backups_dir.iterdir() if d.is_dir() and d.name.startswith('backup_')]
+        if not backup_dirs:
+            return None
+            
+        # Sort by timestamp (embedded in directory name)
+        backup_dirs.sort(key=lambda x: x.name, reverse=True)
+        return backup_dirs[0]
+        
+    except Exception as e:
+        logger.error(f"Error finding latest backup: {e}")
+        return None
+
+def restore_from_backup(user_data_dir: Path, backup_dir: Path = None) -> bool:
+    """Restore user data from the latest backup.
+    
+    Args:
+        user_data_dir: Path to user data directory
+        backup_dir: Specific backup to restore from (optional)
+        
+    Returns:
+        bool: True if restore was successful
+    """
+    try:
+        if backup_dir is None:
+            backup_dir = get_latest_backup(user_data_dir)
+            
+        if backup_dir is None or not backup_dir.exists():
+            logger.warning("No backup found to restore from")
+            return False
+            
+        logger.info(f"Restoring from backup: {backup_dir}")
+        
+        # Load backup metadata if available
+        metadata_file = backup_dir / 'backup_info.json'
+        if metadata_file.exists():
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+                logger.info(f"Restoring backup from {metadata['created']}")
+        
+        # Restore critical directories
+        critical_dirs = ['data']
+        restored_count = 0
+        
+        for dir_name in critical_dirs:
+            backup_source = backup_dir / dir_name
+            restore_target = user_data_dir / dir_name
+            
+            if backup_source.exists():
+                logger.info(f"Restoring: {backup_source} -> {restore_target}")
+                
+                # Ensure target directory exists
+                restore_target.mkdir(parents=True, exist_ok=True)
+                
+                # Copy backup contents to target
+                copy_directory_contents(backup_source, restore_target)
+                restored_count += 1
+        
+        if restored_count > 0:
+            logger.info(f"Successfully restored {restored_count} directories from backup")
+            return True
+        else:
+            logger.warning("No directories were restored from backup")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error restoring from backup: {e}")
+        return False
+
+def cleanup_old_backups(user_data_dir: Path, keep_count: int = 5) -> None:
+    """Clean up old backups, keeping only the most recent ones.
+    
+    Args:
+        user_data_dir: Path to user data directory
+        keep_count: Number of recent backups to keep
+    """
+    try:
+        backups_dir = user_data_dir / 'backups'
+        if not backups_dir.exists():
+            return
+            
+        backup_dirs = [d for d in backups_dir.iterdir() if d.is_dir() and d.name.startswith('backup_')]
+        if len(backup_dirs) <= keep_count:
+            return
+            
+        # Sort by timestamp (newest first)
+        backup_dirs.sort(key=lambda x: x.name, reverse=True)
+        
+        # Remove old backups
+        for old_backup in backup_dirs[keep_count:]:
+            logger.info(f"Removing old backup: {old_backup}")
+            shutil.rmtree(old_backup)
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up old backups: {e}")
+
+def check_and_preserve_data(user_data_dir: Path) -> None:
+    """Check if user data exists and create backup, or restore if data is missing.
+    
+    Args:
+        user_data_dir: Path to user data directory
+    """
+    try:
+        data_dir = user_data_dir / 'data'
+        
+        # Check if critical data directories exist and have content
+        critical_subdirs = ['color_libraries', 'coordinates.db']
+        has_existing_data = False
+        
+        if data_dir.exists():
+            # Check for color libraries
+            color_libs_dir = data_dir / 'color_libraries'
+            if color_libs_dir.exists() and any(color_libs_dir.glob('*.db')):
+                has_existing_data = True
+                logger.info("Found existing color libraries")
+            
+            # Check for coordinates database
+            coordinates_db = data_dir / 'coordinates.db'
+            if coordinates_db.exists() and coordinates_db.stat().st_size > 0:
+                has_existing_data = True
+                logger.info("Found existing coordinates database")
+        
+        if has_existing_data:
+            # Create backup of existing data
+            logger.info("Creating backup of existing user data...")
+            if create_backup(user_data_dir):
+                logger.info("✓ Backup created successfully")
+            else:
+                logger.warning("⚠ Backup creation failed")
+        else:
+            # No existing data found, try to restore from backup
+            logger.info("No existing user data found, checking for backups...")
+            latest_backup = get_latest_backup(user_data_dir)
+            
+            if latest_backup:
+                logger.info(f"Found backup: {latest_backup.name}")
+                if restore_from_backup(user_data_dir, latest_backup):
+                    logger.info("✓ Successfully restored user data from backup")
+                else:
+                    logger.warning("⚠ Failed to restore from backup")
+            else:
+                logger.info("No backups found - this appears to be a fresh installation")
+        
+        # Clean up old backups to save space
+        cleanup_old_backups(user_data_dir, keep_count=5)
+        
+    except Exception as e:
+        logger.error(f"Error in data preservation check: {e}")
+
 # Get the application directories
 if getattr(sys, 'frozen', False):
     app_bundle_dir = Path(sys._MEIPASS)
@@ -52,6 +274,12 @@ else:
 # Get user data directory
 user_data_dir = get_app_data_dir()
 logger.info(f"User data directory: {user_data_dir}")
+
+# *** DATA PRESERVATION SYSTEM ***
+# Check for existing user data and create backups or restore as needed
+logger.info("=== Starting Data Preservation Check ===")
+check_and_preserve_data(user_data_dir)
+logger.info("=== Data Preservation Check Complete ===")
 
 # Add our app directories to Python path
 for dir_name in ['gui', 'utils']:

@@ -407,6 +407,10 @@ class CropCanvas(tk.Canvas):
         # Reset all drag states
         self.tool_manager.set_dragging(False)
         self.shape_manager.active_vertex = None
+        
+        # Clear active marker index for coordinate tool
+        if hasattr(self, '_active_marker_index'):
+            self._active_marker_index = None
     
     def _on_motion(self, event: tk.Event) -> None:
         """Handle mouse motion events."""
@@ -454,6 +458,10 @@ class CropCanvas(tk.Canvas):
         if self.ruler_manager.visible:
             self.ruler_manager.set_scale(self.core.image_scale)
             self.ruler_manager.set_offset(self.core.image_offset)
+        
+        # Update zoom display in control panel if available
+        if hasattr(self, 'main_app') and hasattr(self.main_app, 'control_panel'):
+            self.main_app.control_panel.update_zoom_display(self.core.image_scale)
         
         # Update display
         self.update_display()
@@ -521,49 +529,21 @@ class CropCanvas(tk.Canvas):
         """Handle mouse press in coordinate sampling mode - start drag operation."""
         print(f"DEBUG: Coordinate mouse press at image position: ({image_x:.1f}, {image_y:.1f}) [mathematical coords]")
         
-        # Check if we're in edit mode
-        if hasattr(self, '_edit_marker_index'):
-            print(f"DEBUG: Edit mode active for marker {self._edit_marker_index}")
-            
-            # Find and update the marker
-            for marker in self._coord_markers:
-                if marker.get('index') == self._edit_marker_index + 1:
-                    # Update position
-                    marker['image_pos'] = (image_x, image_y)
-                    
-                    # Update screen position
-                    screen_x, screen_y = self._image_to_screen_coords(image_x, image_y)
-                    marker['canvas_pos'] = (screen_x, screen_y)
-                    
-                    # Clear and redraw
-                    if 'tag' in marker:
-                        self.delete(marker['tag'])
-                    self._draw_coordinate_marker(marker)
-                    
-                    # Enable dragging
-                    self.tool_manager.set_dragging(True)
-                    self.update_idletasks()
-                    
-                    print(f"DEBUG: Updated marker {self._edit_marker_index + 1} position")
-                    return
-            
-        # Check if clicking on an existing marker (for movement)
-        clicked_marker = self._find_marker_at_position(image_x, image_y)
+        # First check if clicking on an existing marker (like crop vertices)
+        # Convert image coords back to screen coords to use the screen-based finder
+        screen_x, screen_y = self.core.image_to_screen_coords(image_x, image_y)
+        marker_index = self._find_marker_at_screen_position(screen_x, screen_y)
         
-        if clicked_marker:
-            marker_index = clicked_marker.get('index', -1)
-            print(f"DEBUG: Clicked on existing marker {marker_index}")
+        if marker_index is not None:
+            print(f"DEBUG: Clicked on existing marker {marker_index}, starting drag")
+            # Set up marker dragging (similar to vertex dragging)
+            self._active_marker_index = marker_index
+            self.tool_manager.set_dragging(True)
             
-            # If marker is being edited, allow movement
-            if hasattr(self, '_edit_marker_index') and self._edit_marker_index is not None:
-                print(f"DEBUG: Moving marker in edit mode")
-                clicked_marker['image_pos'] = (image_x, image_y)
-                self._draw_coordinate_marker(clicked_marker)
-                return
-            else:
-                # Not in edit mode, prevent movement
-                self.status_callback(f"Use the edit button (✎) to modify marker {marker_index}")
-                return
+            # Update status
+            marker = self._coord_markers[marker_index]
+            self.status_callback(f"Dragging sample {marker.get('index', marker_index + 1)}")
+            return
         
         # Get main app for access to control panel
         main_app = None
@@ -667,21 +647,26 @@ class CropCanvas(tk.Canvas):
         print(f"DEBUG: Started dragging sample {self._coord_preview['index']} with settings {settings['sample_type']} {settings['width']}x{settings['height']}")
     
     def _handle_coord_drag(self, screen_x: int, screen_y: int) -> None:
-        """Handle mouse drag in coordinate sampling mode - update preview position."""
-        if not hasattr(self, '_coord_preview'):
-            return
-        
+        """Handle mouse drag in coordinate sampling mode - update preview or marker position."""
         # Convert to image coordinates (image_y in mathematical space)
         image_x, image_y = self.core.screen_to_image_coords(screen_x, screen_y)
         
-        # Update preview position with mathematical coordinate
-        self._coord_preview["image_pos"] = (image_x, image_y)
+        # Check if we're dragging an existing marker
+        if hasattr(self, '_active_marker_index') and self._active_marker_index is not None:
+            # Move existing marker directly
+            self._move_marker(self._active_marker_index, image_x, image_y)
+            return
         
-        # Redraw preview at new position
-        self._draw_coordinate_preview(self._coord_preview)
-        
-        # Update status with mathematical coordinates
-        self.status_callback(f"Positioning sample {self._coord_preview['index']} at ({image_x:.1f}, {image_y:.1f}) [math coords]")
+        # Handle preview dragging (new marker creation)
+        if hasattr(self, '_coord_preview'):
+            # Update preview position with mathematical coordinate
+            self._coord_preview["image_pos"] = (image_x, image_y)
+            
+            # Redraw preview at new position
+            self._draw_coordinate_preview(self._coord_preview)
+            
+            # Update status with mathematical coordinates
+            self.status_callback(f"Positioning sample {self._coord_preview['index']} at ({image_x:.1f}, {image_y:.1f}) [math coords]")
     
     def _handle_coord_release(self, screen_x: int, screen_y: int) -> None:
         """Handle mouse release in coordinate sampling mode - place the marker."""
@@ -760,6 +745,49 @@ class CropCanvas(tk.Canvas):
                 return marker
         
         return None
+    
+    def _find_marker_at_screen_position(self, screen_x: int, screen_y: int) -> Optional[int]:
+        """Find marker index at given screen coordinates (similar to vertex finding).
+        
+        Args:
+            screen_x, screen_y: Screen coordinates to check
+            
+        Returns:
+            Marker index if found, None otherwise
+        """
+        MARKER_GRAB_RADIUS = 15  # Slightly larger than vertex grab radius for easier selection
+        
+        for i, marker in enumerate(self._coord_markers):
+            if marker.get('is_preview', False):
+                continue
+                
+            # Convert marker position to screen coordinates
+            marker_screen_x, marker_screen_y = self.core.image_to_screen_coords(*marker['image_pos'])
+            
+            # Check distance
+            distance = ((screen_x - marker_screen_x) ** 2 + (screen_y - marker_screen_y) ** 2) ** 0.5
+            
+            if distance <= MARKER_GRAB_RADIUS:
+                return i
+        
+        return None
+    
+    def _move_marker(self, marker_index: int, image_x: float, image_y: float) -> None:
+        """Move a marker to new coordinates.
+        
+        Args:
+            marker_index: Index of marker to move
+            image_x, image_y: New coordinates in image space
+        """
+        if 0 <= marker_index < len(self._coord_markers):
+            marker = self._coord_markers[marker_index]
+            marker['image_pos'] = (image_x, image_y)
+            
+            # Redraw the marker at its new position
+            self._draw_coordinate_marker(marker)
+            
+            # Update status
+            self.status_callback(f"Moving sample {marker.get('index', marker_index + 1)} to ({image_x:.1f}, {image_y:.1f})")
 
     def _draw_coordinate_marker(self, marker):
         """Draw a coordinate marker on the canvas"""
@@ -782,7 +810,7 @@ class CropCanvas(tk.Canvas):
             sample_height = sample_width
             print(f"DEBUG: Circle detected, using width {sample_width} for both dimensions")
         
-        # Convert to screen coordinates
+        # Convert to screen coordinates - always use current scale for consistent appearance
         screen_width = sample_width * self.core.image_scale
         screen_height = sample_height * self.core.image_scale
         

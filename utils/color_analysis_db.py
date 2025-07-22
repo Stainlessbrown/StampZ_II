@@ -81,11 +81,34 @@ class ColorAnalysisDB:
                     rgb_r REAL NOT NULL,
                     rgb_g REAL NOT NULL,
                     rgb_b REAL NOT NULL,
+                    sample_type TEXT,
+                    sample_size TEXT,
+                    sample_anchor TEXT,
                     measurement_date TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                     notes TEXT,
                     FOREIGN KEY(set_id) REFERENCES measurement_sets(set_id)
                 )
             """)
+            
+            # Add the new columns to existing databases
+            cursor = conn.cursor()
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN sample_type TEXT")
+                print("Added sample_type column")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN sample_size TEXT")
+                print("Added sample_size column")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN sample_anchor TEXT")
+                print("Added sample_anchor column")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             
             # Index for faster queries
             conn.execute("""
@@ -118,6 +141,9 @@ class ColorAnalysisDB:
         rgb_r: float,
         rgb_g: float,
         rgb_b: float,
+        sample_type: Optional[str] = None,
+        sample_size: Optional[str] = None,
+        sample_anchor: Optional[str] = None,
         notes: Optional[str] = None,
         replace_existing: bool = True
     ) -> bool:
@@ -153,12 +179,14 @@ class ColorAnalysisDB:
                                 x_position = ?, y_position = ?,
                                 l_value = ?, a_value = ?, b_value = ?,
                                 rgb_r = ?, rgb_g = ?, rgb_b = ?,
+                                sample_type = ?, sample_size = ?, sample_anchor = ?,
                                 measurement_date = datetime('now', 'localtime'),
                                 notes = ?
                             WHERE set_id = ? AND coordinate_point = ?
                         """, (
                             x_pos, y_pos, l_value, a_value, b_value,
-                            rgb_r, rgb_g, rgb_b, notes, set_id, coordinate_point
+                            rgb_r, rgb_g, rgb_b, sample_type, sample_size, sample_anchor,
+                            notes, set_id, coordinate_point
                         ))
                         print(f"Updated existing measurement for point {coordinate_point}")
                     else:
@@ -166,23 +194,27 @@ class ColorAnalysisDB:
                         conn.execute("""
                             INSERT INTO color_measurements (
                                 set_id, coordinate_point, x_position, y_position,
-                                l_value, a_value, b_value, rgb_r, rgb_g, rgb_b, notes
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
+                                sample_type, sample_size, sample_anchor, notes
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             set_id, coordinate_point, x_pos, y_pos,
-                            l_value, a_value, b_value, rgb_r, rgb_g, rgb_b, notes
+                            l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
+                            sample_type, sample_size, sample_anchor, notes
                         ))
                         print(f"Inserted new measurement for set {set_id} point {coordinate_point}")
                 else:
-                    # Always insert (old behavior)
+                    # Always insert (old behavior) 
                     conn.execute("""
                         INSERT INTO color_measurements (
                             set_id, coordinate_point, x_position, y_position,
-                            l_value, a_value, b_value, rgb_r, rgb_g, rgb_b, notes
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
+                            sample_type, sample_size, sample_anchor, notes
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         set_id, coordinate_point, x_pos, y_pos,
-                        l_value, a_value, b_value, rgb_r, rgb_g, rgb_b, notes
+                        l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
+                        sample_type, sample_size, sample_anchor, notes
                     ))
                     
                 return True

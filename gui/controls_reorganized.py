@@ -193,6 +193,37 @@ class ReorganizedControlPanel(ttk.Frame):
         ttk.Checkbutton(toggle_frame, text="Show Grid", variable=self.show_grid,
                       command=self._on_grid_toggle).pack(side=tk.LEFT, padx=5)
         
+        # SECTION 3.5: Zoom Control
+        zoom_frame = ttk.LabelFrame(self, text="Zoom Control")
+        zoom_frame.pack(fill=tk.X, padx=5, pady=2)
+        
+        zoom_row = ttk.Frame(zoom_frame)
+        zoom_row.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Zoom level variable (0.1 to 10.0)
+        self.zoom_level = tk.DoubleVar(value=1.0)
+        
+        ttk.Label(zoom_row, text="Zoom:").pack(side=tk.LEFT)
+        
+        # Zoom out button
+        ttk.Button(zoom_row, text="-", width=3, command=self._zoom_out).pack(side=tk.LEFT, padx=(5, 2))
+        
+        # Zoom slider (0-10 scale)
+        self.zoom_scale = ttk.Scale(zoom_row, from_=0.1, to=10.0, 
+                                   variable=self.zoom_level, orient=tk.HORIZONTAL,
+                                   command=self._on_zoom_change, length=120)
+        self.zoom_scale.pack(side=tk.LEFT, padx=2)
+        
+        # Zoom in button
+        ttk.Button(zoom_row, text="+", width=3, command=self._zoom_in).pack(side=tk.LEFT, padx=(2, 5))
+        
+        # Zoom level display
+        self.zoom_display = ttk.Label(zoom_row, text="100%", font=('Arial', 10))
+        self.zoom_display.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Reset zoom button
+        ttk.Button(zoom_row, text="Reset", command=self._reset_zoom).pack(side=tk.RIGHT)
+        
         # SECTION 4: Tool Mode Selection
         mode_frame = ttk.LabelFrame(self, text="Tool Mode")
         mode_frame.pack(fill=tk.X, padx=5, pady=2)
@@ -1501,4 +1532,46 @@ class ReorganizedControlPanel(ttk.Frame):
         else:
             print("DEBUG: main_app not found for add to library")
             messagebox.showinfo("Info", "Add to library - connect to main app implementation")
+    
+    # Zoom control methods
+    def _on_zoom_change(self, value):
+        """Handle zoom slider changes."""
+        try:
+            zoom_level = float(value)
+            # Update zoom level through canvas
+            if hasattr(self, 'main_app') and self.main_app and hasattr(self.main_app, 'canvas'):
+                self.main_app.canvas.core.set_zoom_level(zoom_level)
+                # Important: Update the full canvas display to redraw markers
+                self.main_app.canvas.update_display()
+            
+            # Update display text
+            percentage = int(zoom_level * 100)
+            self.zoom_display.config(text=f"{percentage}%")
+        except ValueError:
+            pass
+    
+    def _zoom_in(self):
+        """Zoom in by 20%."""
+        current = self.zoom_level.get()
+        new_zoom = min(10.0, current * 1.2)
+        self.zoom_level.set(new_zoom)
+        self._on_zoom_change(new_zoom)
+    
+    def _zoom_out(self):
+        """Zoom out by 20%."""
+        current = self.zoom_level.get()
+        new_zoom = max(0.1, current / 1.2)
+        self.zoom_level.set(new_zoom)
+        self._on_zoom_change(new_zoom)
+    
+    def _reset_zoom(self):
+        """Reset zoom to 100% (1.0)."""
+        self.zoom_level.set(1.0)
+        self._on_zoom_change(1.0)
+    
+    def update_zoom_display(self, zoom_level: float):
+        """Update zoom display from external source (like mouse wheel)."""
+        self.zoom_level.set(zoom_level)
+        percentage = int(zoom_level * 100)
+        self.zoom_display.config(text=f"{percentage}%")
     

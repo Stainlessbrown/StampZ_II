@@ -2,6 +2,9 @@
 """StampZ - Main Application Entry Point
 A image analysis application optimized for philatelic images"""
 
+# Import initialize_env first to set up data preservation system
+import initialize_env
+
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
@@ -17,6 +20,7 @@ from utils.recent_files import RecentFilesManager
 from utils.filename_manager import FilenameManager
 from utils.image_straightener import StraighteningTool
 from utils.ods_exporter import ODSExporter
+from gui.preferences_dialog import show_preferences_dialog
 from utils.path_utils import ensure_data_directories
 
 logger = logging.getLogger(__name__)
@@ -100,6 +104,7 @@ class StampZApp:
         self.help_menu = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Help", menu=self.help_menu)
         self.help_menu.add_command(label="About", command=self.show_about)
+        self.help_menu.add_command(label="Preferences...", command=self.open_preferences)
 
     def _create_widgets(self):
         self.canvas = CropCanvas(self.main_container, bg='white', width=800, height=600)
@@ -1206,6 +1211,12 @@ class StampZApp:
                 "Export Error",
                 f"Failed to export analysis:\n\n{str(e)}"
             )
+
+    def open_preferences(self):
+        """Open the preferences dialog."""
+        result = show_preferences_dialog(self.root)
+        if result == "ok":
+            print("Preferences updated successfully.")
 
     def _get_available_libraries(self):
         """Get list of available color libraries."""

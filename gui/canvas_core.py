@@ -160,8 +160,8 @@ class CanvasCore:
         
         new_scale = self.image_scale * factor
         
-        # Limit zoom range
-        if 0.1 <= new_scale <= 5.0:
+        # Limit zoom range (0.1x to 10x for high DPI)
+        if 0.1 <= new_scale <= 10.0:
             # Get mouse position relative to image
             mouse_x = event.x - self.image_offset[0]
             mouse_y = event.y - self.image_offset[1]
@@ -175,6 +175,42 @@ class CanvasCore:
             )
             
             self.update_display()
+    
+    def set_zoom_level(self, zoom_level: float) -> None:
+        """Set specific zoom level.
+        
+        Args:
+            zoom_level: Zoom level (0.1 to 10.0)
+        """
+        if not self.original_image:
+            return
+        
+        # Clamp zoom level to valid range
+        zoom_level = max(0.1, min(10.0, zoom_level))
+        
+        # Get center of canvas for zoom center point
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        center_x = canvas_width / 2
+        center_y = canvas_height / 2
+        
+        # Calculate zoom factor
+        factor = zoom_level / self.image_scale
+        
+        # Get center position relative to image
+        image_center_x = center_x - self.image_offset[0]
+        image_center_y = center_y - self.image_offset[1]
+        
+        # Update scale
+        self.image_scale = zoom_level
+        
+        # Adjust offset to zoom toward center
+        self.image_offset = (
+            center_x - image_center_x * factor,
+            center_y - image_center_y * factor
+        )
+        
+        self.update_display()
     
     def image_to_screen_coords(self, image_x: float, image_y: float) -> Tuple[int, int]:
         """Convert image coordinates to screen coordinates.
