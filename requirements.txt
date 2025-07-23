@@ -1,6 +1,6 @@
 # Core application dependencies
 numpy==2.2.4
-Pillow==11.1.0
+Pillow==10.4.0
 odfpy==1.4.1
 colorspacious==1.1.2
 
