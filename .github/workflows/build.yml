@@ -12,20 +12,18 @@ jobs:
     strategy:
       matrix:
         include:
-          # Re-enabled Windows build with minimal configuration for testing
           - os: windows-latest
             name: windows-x64
             ext: .exe
-          # Temporarily disabled working builds to speed up Windows testing
-          # - os: macos-13
-          #   name: mac-intel
-          #   ext: ""
-          # - os: macos-latest
-          #   name: mac-arm
-          #   ext: ""
-          # - os: ubuntu-latest
-          #   name: linux-x64
-          #   ext: ""
+          - os: macos-13
+            name: mac-intel
+            ext: ""
+          - os: macos-latest
+            name: mac-arm
+            ext: ""
+          - os: ubuntu-latest
+            name: linux-x64
+            ext: ""
     
     runs-on: ${{ matrix.os }}
     
