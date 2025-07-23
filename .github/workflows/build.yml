@@ -112,12 +112,10 @@ jobs:
     - name: Build Linux executable
       if: matrix.os == 'ubuntu-latest'
       run: |
-        # Linux: Create single executable
-        python -m PyInstaller --onefile --windowed --name StampZ_${{ matrix.name }} \
-          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
-          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
-          --collect-all odfpy --add-data "resources:resources" --add-data "data:data" \
-          --runtime-hook runtime_hook.py main.py
+        # Linux: Use PyInstaller spec file for comprehensive PIL/tkinter support
+        python -m PyInstaller stampz.spec
+        # Rename the output to match expected name
+        mv dist/StampZ dist/StampZ_${{ matrix.name }}
         echo "Linux build completed. Checking dist directory:"
         ls -la dist/
         
