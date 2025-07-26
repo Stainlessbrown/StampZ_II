@@ -12,15 +12,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: windows-latest
-            name: windows-x64
-            ext: .exe
-          - os: macos-13
-            name: mac-intel
-            ext: ""
-          - os: macos-latest
-            name: mac-arm
-            ext: ""
+          # Temporarily disabled to isolate Linux build issue
+          # - os: windows-latest
+          #   name: windows-x64
+          #   ext: .exe
+          # - os: macos-13
+          #   name: mac-intel
+          #   ext: ""
+          # - os: macos-latest
+          #   name: mac-arm
+          #   ext: ""
           - os: ubuntu-20.04  # Use Ubuntu 20.04 for compatibility with Ubuntu 18.04+ and Mint 22
             name: linux-x64
             ext: ""
