@@ -21,7 +21,7 @@ jobs:
           - os: macos-latest
             name: mac-arm
             ext: ""
-          - os: ubuntu-latest
+          - os: ubuntu-20.04  # Use Ubuntu 20.04 for compatibility with Ubuntu 18.04+ and Mint 22
             name: linux-x64
             ext: ""
     
@@ -110,7 +110,7 @@ jobs:
         Get-ChildItem dist
         
     - name: Build Linux executable
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-20.04'
       run: |
         # Linux: Use PyInstaller spec file for comprehensive PIL/tkinter support
         python -m PyInstaller stampz.spec
@@ -146,7 +146,7 @@ jobs:
         dir StampZ_${{ matrix.name }}.exe
         
     - name: Package Linux output
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os == 'ubuntu-20.04'
       run: |
         cd dist
         echo "Current dist contents:"
