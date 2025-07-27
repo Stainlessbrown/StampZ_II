@@ -46,21 +46,18 @@ jobs:
           
           # Create and run import test script
           echo 'Testing imports...'
-          cat > test_imports.py << 'EOF'
-import sys
-print('Python version:', sys.version)
-try:
-    import tkinter
-    print('tkinter: OK')
-except ImportError as e:
-    print('tkinter: FAILED -', e)
-    
-try:
-    import PIL
-    print('PIL: OK')
-except ImportError as e:
-    print('PIL: FAILED -', e)
-EOF
+          echo 'import sys' > test_imports.py
+          echo 'print(\"Python version:\", sys.version)' >> test_imports.py
+          echo 'try:' >> test_imports.py
+          echo '    import tkinter' >> test_imports.py
+          echo '    print(\"tkinter: OK\")' >> test_imports.py
+          echo 'except ImportError as e:' >> test_imports.py
+          echo '    print(\"tkinter: FAILED -\", e)' >> test_imports.py
+          echo 'try:' >> test_imports.py
+          echo '    import PIL' >> test_imports.py
+          echo '    print(\"PIL: OK\")' >> test_imports.py
+          echo 'except ImportError as e:' >> test_imports.py
+          echo '    print(\"PIL: FAILED -\", e)' >> test_imports.py
           python3 test_imports.py
           
           # Build using spec file with verbose output
