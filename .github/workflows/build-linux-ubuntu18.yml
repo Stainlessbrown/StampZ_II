@@ -17,6 +17,12 @@ jobs:
     - name: Build in Ubuntu 18.04 Docker container
       run: |
         docker run --rm -v "$PWD":/workspace -w /workspace ubuntu:18.04 bash -c "
+          # Set timezone to avoid interactive prompts
+          export DEBIAN_FRONTEND=noninteractive
+          export TZ=UTC
+          ln -snf /usr/share/zoneinfo/UTC /etc/localtime
+          echo UTC > /etc/timezone
+          
           # Update package lists
           apt-get update
           
