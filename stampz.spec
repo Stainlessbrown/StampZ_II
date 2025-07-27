@@ -67,7 +67,6 @@ a = Analysis(
     runtime_hooks=['runtime_hook.py'],
     excludes=[],
     noarchive=False,
-    optimize=0,
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
