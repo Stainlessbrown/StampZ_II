@@ -1,6 +1,8 @@
 name: Build StampZ Linux (Ubuntu 18.04 Compatible)
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
