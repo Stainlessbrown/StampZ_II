@@ -12,17 +12,16 @@ jobs:
     strategy:
       matrix:
         include:
-          # Temporarily disabled to isolate Linux build issue
-          # - os: windows-latest
-          #   name: windows-x64
-          #   ext: .exe
-          # - os: macos-13
-          #   name: mac-intel
-          #   ext: ""
-          # - os: macos-latest
-          #   name: mac-arm
-          #   ext: ""
-          - os: ubuntu-20.04  # Use Ubuntu 20.04 for compatibility with Ubuntu 18.04+ and Mint 22
+          - os: windows-latest
+            name: windows-x64
+            ext: .exe
+          - os: macos-13
+            name: mac-intel
+            ext: ""
+          - os: macos-latest
+            name: mac-arm
+            ext: ""
+          - os: ubuntu-22.04  # Modern Linux build for Ubuntu 22.04+ and Mint 22
             name: linux-x64
             ext: ""
     
@@ -111,7 +110,7 @@ jobs:
         Get-ChildItem dist
         
     - name: Build Linux executable
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-22.04'
       run: |
         # Linux: Use PyInstaller spec file for comprehensive PIL/tkinter support
         python -m PyInstaller stampz.spec
@@ -147,7 +146,7 @@ jobs:
         dir StampZ_${{ matrix.name }}.exe
         
     - name: Package Linux output
-      if: matrix.os == 'ubuntu-20.04'
+      if: matrix.os == 'ubuntu-22.04'
       run: |
         cd dist
         echo "Current dist contents:"
