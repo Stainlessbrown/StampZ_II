@@ -70,8 +70,9 @@ jobs:
         wget -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool-x86_64.AppImage
         
-        # Create the AppImage
-        ./appimagetool-x86_64.AppImage AppDir StampZ_linux-x64.AppImage
+        # Extract and run appimagetool (works without FUSE)
+        ./appimagetool-x86_64.AppImage --appimage-extract
+        ./squashfs-root/AppRun AppDir StampZ_linux-x64.AppImage
         
         # Make it executable
         chmod +x StampZ_linux-x64.AppImage
