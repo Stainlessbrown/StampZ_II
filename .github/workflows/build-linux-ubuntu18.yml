@@ -41,11 +41,22 @@ jobs:
           # Build using spec file
           python3 -m PyInstaller stampz.spec
           
-          # Rename for Ubuntu 18.04 compatibility
-          mv dist/StampZ dist/StampZ_linux-x64-ubuntu18
+          # Show what PyInstaller created
+          echo 'PyInstaller output:'
+          ls -la dist/
           
-          # Show what was built
-          echo 'Build completed. Contents:'
+          # Rename for Ubuntu 18.04 compatibility (one-file executable)
+          if [ -f dist/StampZ ]; then
+            mv dist/StampZ dist/StampZ_linux-x64-ubuntu18
+            echo 'Renamed StampZ to StampZ_linux-x64-ubuntu18'
+          else
+            echo 'ERROR: dist/StampZ not found!'
+            ls -la dist/
+            exit 1
+          fi
+          
+          # Show final result
+          echo 'Build completed. Final contents:'
           ls -la dist/
           
           # Check GLIBC dependency
