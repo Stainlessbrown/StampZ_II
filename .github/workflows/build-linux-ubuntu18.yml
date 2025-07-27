@@ -27,19 +27,28 @@ jobs:
           apt-get update
           
           # Install Python 3.6 and development tools
-          apt-get install -y python3 python3-pip python3-dev python3-tk tk-dev build-essential
+          apt-get install -y python3 python3-pip python3-dev python3-tk tk-dev build-essential libffi-dev
           
-          # Upgrade pip
-          python3 -m pip install --upgrade pip
+          # Upgrade pip and setuptools
+          python3 -m pip install --upgrade pip setuptools wheel
           
-          # Install requirements
-          pip3 install -r requirements.txt
+          # Install requirements with verbose output
+          echo 'Installing requirements...'
+          pip3 install -r requirements.txt --verbose
           
           # Install PyInstaller
+          echo 'Installing PyInstaller...'
           pip3 install pyinstaller
           
-          # Build using spec file
-          python3 -m PyInstaller stampz.spec
+          # Verify Python can import main modules
+          echo 'Testing imports...'
+          python3 -c 'import tkinter; print("tkinter OK")'
+          python3 -c 'import PIL; print("PIL OK")'
+          python3 -c 'import sys; print(f"Python version: {sys.version}")'
+          
+          # Build using spec file with verbose output
+          echo 'Running PyInstaller...'
+          python3 -m PyInstaller stampz.spec --log-level DEBUG
           
           # Show what PyInstaller created
           echo 'PyInstaller output:'
