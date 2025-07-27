@@ -50,7 +50,7 @@ jobs:
           echo 'Testing imports...'
           python3 -c 'import tkinter; print("tkinter OK")'
           python3 -c 'import PIL; print("PIL OK")'
-          python3 -c 'import sys; print(f"Python version: {sys.version}")'
+          python3 -c 'import sys; print("Python version: " + sys.version)'
           
           # Build using spec file with verbose output
           echo 'Running PyInstaller...'
