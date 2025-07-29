@@ -422,24 +422,9 @@ class ColorComparisonManager(tk.Frame):
         lib_frame.pack(fill=tk.X)
         ttk.Label(lib_frame, text="Select library:").pack(side=tk.LEFT)
         
-        # Get available libraries using the same method as the Compare dropdown
-        library_files = set()  # Use set to avoid duplicates
-        
-        # Get directories to check
-        library_dirs = self._get_library_directories()
-        
-        for library_dir in library_dirs:
-            if not os.path.exists(library_dir):
-                continue
-            
-            # Get list of library files
-            for f in os.listdir(library_dir):
-                if f.endswith("_library.db") and not f.lower().startswith("all_libraries"):
-                    library_name = f[:-11]  # Remove '_library.db' suffix
-                    library_files.add(library_name)
-        
-        # Convert to sorted list
-        library_list = sorted(list(library_files))
+        # Load available libraries similar to Sample mode
+        self._load_available_libraries()
+        library_list = self.library_combo['values'][1:]  # Exclude 'All Libraries' option
         
         lib_var = tk.StringVar()
         lib_combo = ttk.Combobox(lib_frame, textvariable=lib_var, values=library_list, width=27)
