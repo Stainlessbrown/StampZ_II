@@ -109,7 +109,7 @@ class DatabaseViewer:
         ttk.Button(controls_frame, text="Refresh", command=self._refresh_data).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Delete Selected", command=self._delete_selected).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Clear All", command=self._clear_all_data).pack(side=tk.LEFT, padx=5)
-        ttk.Button(controls_frame, text="Delete Sample Set", command=self._delete_sample_set).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls_frame, text="Delete Current", command=self._delete_sample_set).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Manage Templates", command=self._open_template_manager).pack(side=tk.LEFT, padx=5)
         
         # Create treeview with scrollbars
