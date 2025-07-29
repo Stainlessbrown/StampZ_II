@@ -920,6 +920,7 @@ class StampZApp:
             sample_type = 'circle' if coord.sample_type == SampleAreaType.CIRCLE else 'rectangle'
             
             marker = {
+                'index': i + 1,  # 1-based sample numbering
                 'image_pos': (coord.x, coord.y),
                 'canvas_pos': (canvas_x, canvas_y),
                 'sample_type': sample_type,

@@ -180,6 +180,12 @@ class ColorAnalyzer:
                 sample_height = marker.get('sample_height', 20)
                 anchor = marker.get('anchor', 'center')
                 
+                # Debug output for sample #4 issue
+                print(f"DEBUG: Processing canvas marker {i} (1-based: {i+1})")
+                print(f"  Position: ({x}, {y})")
+                print(f"  Sample type: {sample_type}, Size: {sample_width}x{sample_height}, Anchor: {anchor}")
+                print(f"  Marker index from data: {marker.get('index', 'N/A')}")
+                
                 # Create a temporary CoordinatePoint-like object for sampling
                 class TempCoord:
                     def __init__(self, x, y, sample_type, width, height, anchor):
@@ -280,11 +286,23 @@ class ColorAnalyzer:
             right = int(x)
             bottom = int(y)
         
+        # Debug output after bounds calculation
+        print(f"DEBUG: Sample area bounds calculation:")
+        print(f"  Center position: ({x}, {y})")
+        print(f"  Sample size: {width}x{height}")
+        print(f"  Calculated bounds: ({left}, {top}, {right}, {bottom})")
+        print(f"  Image dimensions: {image.width}x{image.height}")
+        
         # Clamp to image bounds
+        original_bounds = (left, top, right, bottom)
         left = max(0, left)
         top = max(0, top)
         right = min(image.width, right)
         bottom = min(image.height, bottom)
+        
+        if original_bounds != (left, top, right, bottom):
+            print(f"DEBUG: Bounds were clamped from {original_bounds} to ({left}, {top}, {right}, {bottom})")
+            print(f"  This indicates the sample area extends outside the image boundaries!")
         
         # Check if we have a valid area
         if left >= right or top >= bottom:

@@ -321,25 +321,29 @@ class DatabaseViewer:
                 
                 # Add to treeview
                 for measurement in self.measurements:
+                    # Map data to correct columns based on column definitions
+                    # columns = ["set_id", "image_name", "measurement_date", "point", "l_value", "a_value", "b_value",
+                    #           "rgb_r", "rgb_g", "rgb_b", "x_pos", "y_pos", "shape", "size", "notes"]
                     values = [
-                        measurement.get('id', ''),  # Use actual database ID for deletion
-                        measurement.get('set_id', ''),
-                        measurement.get('image_name', ''),
-                        measurement.get('measurement_date', ''),
-                        measurement.get('coordinate_point', ''),
-                        f"{measurement.get('l_value', 0):.2f}",
-                        f"{measurement.get('a_value', 0):.2f}",
-                        f"{measurement.get('b_value', 0):.2f}",
-                        f"{measurement.get('rgb_r', 0):.2f}",
-                        f"{measurement.get('rgb_g', 0):.2f}",
-                        f"{measurement.get('rgb_b', 0):.2f}",
-                        f"{measurement.get('x_position', 0):.1f}",
-                        f"{measurement.get('y_position', 0):.1f}",
+                        measurement.get('set_id', ''),           # set_id column
+                        measurement.get('image_name', ''),       # image_name column 
+                        measurement.get('measurement_date', ''), # measurement_date column
+                        measurement.get('coordinate_point', ''), # point column
+                        f"{measurement.get('l_value', 0):.2f}",  # l_value column
+                        f"{measurement.get('a_value', 0):.2f}",  # a_value column
+                        f"{measurement.get('b_value', 0):.2f}",  # b_value column
+                        f"{measurement.get('rgb_r', 0):.2f}",    # rgb_r column
+                        f"{measurement.get('rgb_g', 0):.2f}",    # rgb_g column
+                        f"{measurement.get('rgb_b', 0):.2f}",    # rgb_b column
+                        f"{measurement.get('x_position', 0):.1f}", # x_pos column
+                        f"{measurement.get('y_position', 0):.1f}", # y_pos column
                         '',  # shape placeholder
                         '',  # size placeholder
-                        measurement.get('notes', '')
+                        measurement.get('notes', '')             # notes column
                     ]
-                    self.tree.insert('', 'end', values=values)
+                    # Use measurement ID as the item ID for easier deletion
+                    item_id = measurement.get('id', '')
+                    self.tree.insert('', 'end', iid=str(item_id), values=values)
                 
                 self.status_var.set(f"Loaded {len(self.measurements)} measurements from {self.current_sample_set}")
             
@@ -540,12 +544,8 @@ class DatabaseViewer:
                 from utils.color_analysis_db import ColorAnalysisDB
                 db = ColorAnalysisDB(self.current_sample_set)
                 
-                # Get the IDs of selected items
-                selected_ids = []
-                for item_id in self.selected_items:
-                    values = self.tree.item(item_id)['values']
-                    if values:
-                        selected_ids.append(values[0])  # First column is ID
+                # Get the IDs of selected items (using item IIDs which are the database IDs)
+                selected_ids = list(self.selected_items)
                 
                 # Delete from database
                 with sqlite3.connect(db.db_path) as conn:
