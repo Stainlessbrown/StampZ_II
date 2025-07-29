@@ -164,9 +164,22 @@ class ODSExporter:
                     
                     # Convert to our ColorMeasurement objects
                     for measurement in measurements_to_process:
-                        # Create data_id from image filename + sample set + point number
+                        # Create data_id from image filename + timestamp + sample number
                         image_basename = os.path.splitext(os.path.basename(measurement['image_name']))[0]
-                        data_id = f"{image_basename}_{sample_set_name}_#{measurement['coordinate_point']}"
+                        
+                        # Extract timestamp from measurement_date and format it
+                        # measurement_date format is usually "2025-07-21 17:36:02"
+                        try:
+                            from datetime import datetime
+                            # Parse the measurement date
+                            date_obj = datetime.strptime(measurement['measurement_date'], '%Y-%m-%d %H:%M:%S')
+                            # Format as compact timestamp: YYYYMMDD_HHMMSS
+                            timestamp = date_obj.strftime('%Y%m%d_%H%M%S')
+                        except:
+                            # Fallback if date parsing fails
+                            timestamp = measurement['measurement_date'].replace(' ', '_').replace(':', '').replace('-', '')
+                        
+                        data_id = f"{image_basename}_{timestamp}_sample{measurement['coordinate_point']}"
                         
                         # Get coordinate details - FIRST try from the measurement itself (has actual values)
                         coord_point = measurement['coordinate_point']

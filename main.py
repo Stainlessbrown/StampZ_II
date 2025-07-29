@@ -498,66 +498,40 @@ class StampZApp:
             messagebox.showerror("Straightening Error", f"Failed to straighten image: {str(e)}")
 
     def _view_spreadsheet(self):
-        """Open spreadsheet view of color analysis data."""
+        """Open spreadsheet view of color analysis data.
+        
+        Logic:
+        1. If there's a current image with analysis data -> show that specific analysis
+        2. If there's no current image/analysis -> show dialog to choose which data to view
+        """
         try:
             # Get sample set name from control panel
             sample_set_name = self.control_panel.sample_set_name.get().strip()
             
-            # Use persistent user data directory for color data
-            import sys
+            # Check if we have a current image with analysis data
+            has_current_analysis = False
+            if sample_set_name and self.current_file:
+                # Check if there's analysis data for the current sample set
+                from utils.ods_exporter import ODSExporter
+                test_exporter = ODSExporter(sample_set_name=sample_set_name)
+                test_measurements = test_exporter.get_color_measurements()
+                has_current_analysis = bool(test_measurements)
             
-            if hasattr(sys, '_MEIPASS'):
-                # Running in PyInstaller bundle - use user data directory
-                if sys.platform.startswith('linux'):
-                    user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-                elif sys.platform == 'darwin':
-                    user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-                else:
-                    user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-                color_data_dir = os.path.join(user_data_dir, "data", "color_analysis")
+            if has_current_analysis:
+                # Case 1: We have current analysis data, show it directly
+                print(f"DEBUG: Showing analysis for current sample set: {sample_set_name}")
+                exporter = ODSExporter(sample_set_name=sample_set_name)
+                success = exporter.view_latest_spreadsheet()
+                
+                if not success:
+                    messagebox.showerror(
+                        "View Error",
+                        "Failed to open spreadsheet. Please check that LibreOffice Calc is installed."
+                    )
             else:
-                # Running from source - use relative path
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                color_data_dir = os.path.join(current_dir, "data", "color_analysis")
-            
-            # Check if the data directory exists
-            if not os.path.exists(color_data_dir):
-                messagebox.showinfo(
-                    "No Data",
-                    "No color analysis data found.\n\n"
-                    "Please run color analysis first using the Sample tool."
-                )
-                return
-            
-            # Create exporter
-            from utils.ods_exporter import ODSExporter
-            exporter = ODSExporter(sample_set_name=sample_set_name if sample_set_name else None)
-            
-            # Check if we have data
-            measurements = exporter.get_color_measurements()
-            if not measurements:
-                if sample_set_name:
-                    messagebox.showinfo(
-                        "No Data",
-                        f"No color analysis data found for sample set '{sample_set_name}'.\n\n"
-                        "Please run color analysis first using the Sample tool."
-                    )
-                else:
-                    messagebox.showinfo(
-                        "No Data",
-                        "No color analysis data found in any sample sets.\n\n"
-                        "Please run color analysis first using the Sample tool."
-                    )
-                return
-            
-            # Create a temporary spreadsheet and open it
-            success = exporter.view_latest_spreadsheet()
-            
-            if not success:
-                messagebox.showerror(
-                    "View Error",
-                    "Failed to open spreadsheet. Please check that LibreOffice Calc is installed."
-                )
+                # Case 2: No current analysis, show selection dialog
+                print("DEBUG: No current analysis found, showing selection dialog")
+                self._show_data_selection_dialog()
             
         except ImportError as e:
             messagebox.showerror(
@@ -568,6 +542,158 @@ class StampZApp:
             messagebox.showerror(
                 "View Error",
                 f"Failed to open spreadsheet view:\n\n{str(e)}"
+            )
+    
+    def _show_data_selection_dialog(self):
+        """Show dialog to select which spreadsheet data to view."""
+        try:
+            from tkinter import Toplevel, Listbox, Button, Frame, Label, Scrollbar
+            from utils.color_analysis_db import ColorAnalysisDB
+            from utils.path_utils import get_color_analysis_dir
+            
+            # Get available sample sets
+            color_data_dir = get_color_analysis_dir()
+            if not os.path.exists(color_data_dir):
+                messagebox.showinfo(
+                    "No Data",
+                    "No color analysis data found.\n\n"
+                    "Please run color analysis first using the Sample tool."
+                )
+                return
+            
+            available_sets = ColorAnalysisDB.get_all_sample_set_databases(color_data_dir)
+            if not available_sets:
+                messagebox.showinfo(
+                    "No Data",
+                    "No color analysis data found.\n\n"
+                    "Please run color analysis first using the Sample tool."
+                )
+                return
+            
+            # Create dialog
+            dialog = Toplevel(self.root)
+            dialog.title("Select Data to View")
+            
+            dialog_width = 450
+            dialog_height = 350
+            
+            # Center the dialog
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            x = (screen_width - dialog_width) // 2
+            y = (screen_height - dialog_height) // 2
+            
+            dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+            dialog.resizable(False, False)
+            dialog.transient(self.root)
+            dialog.grab_set()
+            dialog.focus_force()
+            
+            # Header
+            Label(dialog, text="Choose which data to view:", font=("Arial", 12, "bold")).pack(pady=10)
+            
+            # Sample sets listbox frame
+            sets_frame = Frame(dialog)
+            sets_frame.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+            
+            Label(sets_frame, text="Available Sample Sets:", font=("Arial", 10)).pack(anchor="w")
+            
+            # Listbox with scrollbar
+            listbox_frame = Frame(sets_frame)
+            listbox_frame.pack(fill="both", expand=True, pady=5)
+            
+            sets_listbox = Listbox(listbox_frame, font=("Arial", 11))
+            sets_listbox.pack(side="left", fill="both", expand=True)
+            
+            scrollbar = Scrollbar(listbox_frame)
+            scrollbar.pack(side="right", fill="y")
+            sets_listbox.config(yscrollcommand=scrollbar.set)
+            scrollbar.config(command=sets_listbox.yview)
+            
+            # Populate listbox with sample sets
+            for sample_set in available_sets:
+                sets_listbox.insert("end", sample_set)
+            
+            # Select first item by default
+            if available_sets:
+                sets_listbox.selection_set(0)
+            
+            # Variables to store selection
+            selected_option = None
+            selected_sample_set = None
+            
+            def on_view_selected():
+                nonlocal selected_option, selected_sample_set
+                selection = sets_listbox.curselection()
+                if not selection:
+                    messagebox.showwarning("No Selection", "Please select a sample set to view")
+                    return
+                
+                selected_option = "specific"
+                selected_sample_set = available_sets[selection[0]]
+                dialog.quit()
+                dialog.destroy()
+            
+            def on_view_all():
+                nonlocal selected_option
+                selected_option = "all"
+                dialog.quit()
+                dialog.destroy()
+            
+            def on_cancel():
+                nonlocal selected_option
+                selected_option = None
+                dialog.quit()
+                dialog.destroy()
+            
+            # Buttons frame
+            buttons_frame = Frame(dialog)
+            buttons_frame.pack(pady=10)
+            
+            Button(buttons_frame, text="View Selected Set", command=on_view_selected, width=15).pack(side="left", padx=5)
+            Button(buttons_frame, text="View All Data", command=on_view_all, width=15).pack(side="left", padx=5)
+            Button(buttons_frame, text="Cancel", command=on_cancel, width=10).pack(side="left", padx=5)
+            
+            # Keyboard bindings
+            dialog.bind('<Return>', lambda e: on_view_selected())
+            dialog.bind('<Escape>', lambda e: on_cancel())
+            sets_listbox.bind("<Double-Button-1>", lambda e: on_view_selected())
+            
+            # Focus on listbox
+            sets_listbox.focus_set()
+            
+            # Wait for dialog result
+            dialog.mainloop()
+            
+            # Process the result
+            if selected_option == "specific" and selected_sample_set:
+                print(f"DEBUG: User selected specific sample set: {selected_sample_set}")
+                from utils.ods_exporter import ODSExporter
+                exporter = ODSExporter(sample_set_name=selected_sample_set)
+                success = exporter.view_latest_spreadsheet()
+                
+                if not success:
+                    messagebox.showerror(
+                        "View Error",
+                        "Failed to open spreadsheet. Please check that LibreOffice Calc is installed."
+                    )
+            elif selected_option == "all":
+                print("DEBUG: User selected to view all data combined")
+                from utils.ods_exporter import ODSExporter
+                exporter = ODSExporter(sample_set_name=None)  # None means all data
+                success = exporter.view_latest_spreadsheet()
+                
+                if not success:
+                    messagebox.showerror(
+                        "View Error",
+                        "Failed to open spreadsheet. Please check that LibreOffice Calc is installed."
+                    )
+            # If selected_option is None, user cancelled - do nothing
+            
+        except Exception as e:
+            messagebox.showerror(
+                "Dialog Error",
+                f"Failed to show data selection dialog:\n\n{str(e)}"
             )
 
     def _clear_samples(self, skip_confirmation=False, reset_all=False):

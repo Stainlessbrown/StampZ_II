@@ -109,6 +109,7 @@ class DatabaseViewer:
         ttk.Button(controls_frame, text="Refresh", command=self._refresh_data).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Delete Selected", command=self._delete_selected).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Clear All", command=self._clear_all_data).pack(side=tk.LEFT, padx=5)
+        ttk.Button(controls_frame, text="Delete Sample Set", command=self._delete_sample_set).pack(side=tk.LEFT, padx=5)
         ttk.Button(controls_frame, text="Manage Templates", command=self._open_template_manager).pack(side=tk.LEFT, padx=5)
         
         # Create treeview with scrollbars
@@ -321,6 +322,7 @@ class DatabaseViewer:
                 # Add to treeview
                 for measurement in self.measurements:
                     values = [
+                        measurement.get('id', ''),  # Use actual database ID for deletion
                         measurement.get('set_id', ''),
                         measurement.get('image_name', ''),
                         measurement.get('measurement_date', ''),
@@ -437,6 +439,84 @@ class DatabaseViewer:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to delete color library: {str(e)}")
 
+    def _delete_sample_set(self):
+        """Delete the entire sample set database and its related coordinate template."""
+        if not self.current_sample_set:
+            messagebox.showinfo("No Sample Set Selected", "Please select a sample set first")
+            return
+        
+        if self.data_source.get() == "color_analysis":
+            if not messagebox.askyesno("Confirm Delete Sample Set",
+                                      f"DELETE ENTIRE SAMPLE SET '{self.current_sample_set}'?\n\n"
+                                      "This will delete:\n"
+                                      "• All color measurements\n"
+                                      "• The sample set database file\n"
+                                      "• The coordinate template (if it exists)\n\n"
+                                      "This action cannot be undone!"):
+                return
+            
+            try:
+                from utils.color_analysis_db import ColorAnalysisDB
+                from utils.coordinate_db import CoordinateDB
+                from utils.path_utils import get_color_analysis_dir
+                
+                # Delete the color analysis database file
+                data_dir = get_color_analysis_dir()
+                db_path = os.path.join(data_dir, f"{self.current_sample_set}.db")
+                
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                    print(f"DEBUG: Deleted color analysis database: {db_path}")
+                
+                # Also try to delete the coordinate template
+                try:
+                    coord_db = CoordinateDB()
+                    if coord_db.delete_coordinate_set(self.current_sample_set):
+                        print(f"DEBUG: Deleted coordinate template: {self.current_sample_set}")
+                    else:
+                        print(f"DEBUG: No coordinate template found for: {self.current_sample_set}")
+                except Exception as coord_e:
+                    print(f"DEBUG: Error deleting coordinate template: {coord_e}")
+                    # Don't fail the whole operation if coordinate deletion fails
+                
+                # Refresh the sample set list
+                self._load_sample_sets()
+                messagebox.showinfo("Success", 
+                                   f"Sample set '{self.current_sample_set}' has been completely deleted.\n\n"
+                                   "This included the color measurements database and coordinate template.")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete sample set: {str(e)}")
+        
+        else:  # color_libraries
+            if not messagebox.askyesno("Confirm Delete Library",
+                                      f"DELETE COLOR LIBRARY '{self.current_sample_set}'?\n\n"
+                                      "This will permanently delete the entire library file.\n\n"
+                                      "This action cannot be undone!"):
+                return
+            
+            try:
+                from utils.path_utils import get_color_libraries_dir
+                data_dir = get_color_libraries_dir()
+                
+                # Try different naming conventions for color libraries
+                db_path = None
+                if os.path.exists(os.path.join(data_dir, f"{self.current_sample_set}_library.db")):
+                    db_path = os.path.join(data_dir, f"{self.current_sample_set}_library.db")
+                elif os.path.exists(os.path.join(data_dir, f"{self.current_sample_set}.db")):
+                    db_path = os.path.join(data_dir, f"{self.current_sample_set}.db")
+                
+                if db_path and os.path.exists(db_path):
+                    os.remove(db_path)
+                    print(f"DEBUG: Deleted color library: {db_path}")
+                
+                # Refresh the sample set list
+                self._load_sample_sets()
+                messagebox.showinfo("Success", f"Color library '{self.current_sample_set}' has been deleted")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete color library: {str(e)}")
+    
     def _open_template_manager(self):
         """Open the Template Manager window."""
         from gui.template_manager import TemplateManager
@@ -470,12 +550,23 @@ class DatabaseViewer:
                 # Delete from database
                 with sqlite3.connect(db.db_path) as conn:
                     cursor = conn.cursor()
+                    deleted_count = 0
                     for measurement_id in selected_ids:
+                        print(f"DEBUG: Attempting to delete measurement with ID: {measurement_id}")
                         cursor.execute(
                             "DELETE FROM color_measurements WHERE id = ?",
                             (measurement_id,)
                         )
+                        deleted_count += cursor.rowcount
+                        print(f"DEBUG: Rows affected: {cursor.rowcount}")
                     conn.commit()
+                    print(f"DEBUG: Total deleted rows: {deleted_count}")
+                    
+                    if deleted_count == 0:
+                        messagebox.showwarning("Delete Warning", 
+                                             f"No rows were deleted. The selected items may no longer exist in the database.")
+                        self._refresh_data()  # Refresh to show current state
+                        return
                 
                 # Refresh display
                 self._refresh_data()
