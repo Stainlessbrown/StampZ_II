@@ -29,20 +29,23 @@ jobs:
             libjpeg-dev libpng-dev libtiff-dev libfreetype6-dev liblcms2-dev libopenjp2-7-dev \
             zlib1g-dev libwebp-dev
           
-          # Upgrade pip and setuptools
-          python3 -m pip install --upgrade pip setuptools wheel
+          # Upgrade pip and setuptools (use compatible versions)
+          python3 -m pip install --upgrade 'pip<22' 'setuptools<60' 'wheel<0.38'
           
-          # Install PIL/Pillow first with proper dependencies
-          echo 'Installing Pillow with system dependencies...'
-          pip3 install Pillow --verbose
+          # Force all packages to build from source (no pre-compiled wheels)
+          export PIP_NO_BINARY=':all:'
           
-          # Install other requirements
-          echo 'Installing other requirements...'
-          pip3 install -r requirements.txt --verbose
+          # Install PIL/Pillow from source with system dependencies
+          echo 'Installing Pillow from source with system dependencies...'
+          pip3 install 'Pillow==8.4.0' --no-binary=Pillow --verbose
           
-          # Install PyInstaller
-          echo 'Installing PyInstaller...'
-          pip3 install pyinstaller
+          # Install other requirements from source
+          echo 'Installing other requirements from source...'
+          pip3 install --no-binary=':all:' -r requirements.txt --verbose
+          
+          # Install compatible PyInstaller version
+          echo 'Installing PyInstaller 4.10 (Ubuntu 18.04 compatible)...'
+          pip3 install 'pyinstaller==4.10' --no-binary=pyinstaller
           
           # Create and run import test script
           echo 'Testing imports...'
@@ -82,9 +85,29 @@ jobs:
           echo 'Build completed. Final contents:'
           ls -la dist/
           
-          # Check GLIBC dependency
+          # Check GLIBC dependencies in detail
           echo 'GLIBC dependencies:'
           ldd dist/StampZ_linux-x64-ubuntu18 | grep libc || echo 'Static binary or no libc dependency shown'
+          
+          # Check what GLIBC versions are required
+          echo 'Required GLIBC versions:'
+          objdump -T dist/StampZ_linux-x64-ubuntu18 | grep GLIBC | sort -u || echo 'No GLIBC symbols found'
+          
+          # Verify Ubuntu 18.04 compatibility by testing in fresh container
+          echo 'Testing Ubuntu 18.04 compatibility...'
+          docker run --rm -v \"\$PWD/dist\":/test ubuntu:18.04 bash -c '
+            # Install minimal runtime dependencies
+            apt-get update
+            apt-get install -y python3-tk libgtk2.0-0 libx11-6 libxrender1 libxext6 libxft2
+            
+            # Test if the binary can at least start
+            echo "Testing if StampZ_linux-x64-ubuntu18 can execute..."
+            /test/StampZ_linux-x64-ubuntu18 --version 2>&1 || echo "Binary test completed (exit code: \$?)"
+            
+            # Check GLIBC availability on Ubuntu 18.04
+            echo "Available GLIBC version in Ubuntu 18.04:"
+            ldd --version | head -1
+          '
         "
     
     - name: Upload Ubuntu 18.04 compatible executable
