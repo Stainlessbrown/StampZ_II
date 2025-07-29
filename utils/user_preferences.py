@@ -18,15 +18,25 @@ class ExportPreferences:
     auto_open_after_export: bool = True
     export_filename_format: str = "{sample_set}_{date}"  # Template for filename
     include_timestamp: bool = False  # Whether to include timestamp in filename
+
+
+@dataclass
+class FileDialogPreferences:
+    """Preferences for file dialogs."""
+    last_open_directory: str = ""  # Last directory used for opening files
+    last_save_directory: str = ""  # Last directory used for saving files
+    remember_directories: bool = True  # Whether to remember last used directories
     
     
 @dataclass 
 class UserPreferences:
     """Main user preferences container."""
     export_prefs: ExportPreferences
+    file_dialog_prefs: FileDialogPreferences
     
     def __init__(self):
         self.export_prefs = ExportPreferences()
+        self.file_dialog_prefs = FileDialogPreferences()
 
 
 class PreferencesManager:
@@ -89,6 +99,76 @@ class PreferencesManager:
             print(f"Error setting export directory: {e}")
             return False
     
+    def get_last_open_directory(self) -> Optional[str]:
+        """Get the last directory used for opening files."""
+        if not self.preferences.file_dialog_prefs.remember_directories:
+            return None
+            
+        last_dir = self.preferences.file_dialog_prefs.last_open_directory
+        if last_dir and Path(last_dir).exists():
+            return last_dir
+        return None
+    
+    def set_last_open_directory(self, directory: str) -> bool:
+        """Set the last directory used for opening files."""
+        if not self.preferences.file_dialog_prefs.remember_directories:
+            return True  # Don't save if remembering is disabled
+            
+        try:
+            path = Path(directory)
+            if path.is_file():
+                # If it's a file, get the parent directory
+                directory = str(path.parent)
+            
+            self.preferences.file_dialog_prefs.last_open_directory = directory
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting last open directory: {e}")
+            return False
+    
+    def get_last_save_directory(self) -> Optional[str]:
+        """Get the last directory used for saving files."""
+        if not self.preferences.file_dialog_prefs.remember_directories:
+            return None
+            
+        last_dir = self.preferences.file_dialog_prefs.last_save_directory
+        if last_dir and Path(last_dir).exists():
+            return last_dir
+        return None
+    
+    def set_last_save_directory(self, directory: str) -> bool:
+        """Set the last directory used for saving files."""
+        if not self.preferences.file_dialog_prefs.remember_directories:
+            return True  # Don't save if remembering is disabled
+            
+        try:
+            path = Path(directory)
+            if path.is_file():
+                # If it's a file, get the parent directory
+                directory = str(path.parent)
+            
+            self.preferences.file_dialog_prefs.last_save_directory = directory
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting last save directory: {e}")
+            return False
+    
+    def get_remember_directories(self) -> bool:
+        """Get whether to remember last used directories."""
+        return self.preferences.file_dialog_prefs.remember_directories
+    
+    def set_remember_directories(self, remember: bool) -> bool:
+        """Set whether to remember last used directories."""
+        try:
+            self.preferences.file_dialog_prefs.remember_directories = remember
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting remember directories preference: {e}")
+            return False
+    
     def get_export_filename(self, sample_set_name: str = None, extension: str = ".ods") -> str:
         """Generate export filename based on preferences."""
         from datetime import datetime
@@ -135,6 +215,15 @@ class PreferencesManager:
                         include_timestamp=export_data.get('include_timestamp', False)
                     )
                 
+                # Load file dialog preferences
+                if 'file_dialog_prefs' in data:
+                    dialog_data = data['file_dialog_prefs']
+                    self.preferences.file_dialog_prefs = FileDialogPreferences(
+                        last_open_directory=dialog_data.get('last_open_directory', ''),
+                        last_save_directory=dialog_data.get('last_save_directory', ''),
+                        remember_directories=dialog_data.get('remember_directories', True)
+                    )
+                
                 print(f"Loaded preferences from {self.prefs_file}")
                 return True
         except Exception as e:
@@ -152,7 +241,8 @@ class PreferencesManager:
             
             # Convert to dictionary for JSON serialization
             data = {
-                'export_prefs': asdict(self.preferences.export_prefs)
+                'export_prefs': asdict(self.preferences.export_prefs),
+                'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs)
             }
             
             with open(self.prefs_file, 'w') as f:

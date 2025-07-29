@@ -63,6 +63,9 @@ class PreferencesDialog:
         # Export preferences tab
         self._create_export_tab(notebook)
         
+        # File dialog preferences tab
+        self._create_file_dialog_tab(notebook)
+        
         # Future tabs can be added here
         # self._create_general_tab(notebook)
         # self._create_appearance_tab(notebook)
@@ -230,6 +233,101 @@ class PreferencesDialog:
             font=("TkDefaultFont", 9)
         ).pack(anchor=tk.W)
     
+    def _create_file_dialog_tab(self, notebook):
+        """Create the file dialog preferences tab."""
+        dialog_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(dialog_frame, text="File Dialogs")
+        
+        # Remember directories section
+        remember_frame = ttk.LabelFrame(dialog_frame, text="Directory Memory", padding="10")
+        remember_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.remember_directories_var = tk.BooleanVar()
+        ttk.Checkbutton(
+            remember_frame,
+            text="Remember last used directories for Open and Save dialogs",
+            variable=self.remember_directories_var
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        ttk.Label(
+            remember_frame,
+            text="When enabled, file dialogs will start in the directory you last used.",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W)
+        
+        # Current directories section
+        current_frame = ttk.LabelFrame(dialog_frame, text="Current Remembered Directories", padding="10")
+        current_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Last open directory
+        ttk.Label(current_frame, text="Last Open directory:").pack(anchor=tk.W)
+        self.last_open_var = tk.StringVar()
+        ttk.Entry(
+            current_frame,
+            textvariable=self.last_open_var,
+            state="readonly",
+            width=60
+        ).pack(fill=tk.X, pady=(2, 10))
+        
+        # Last save directory
+        ttk.Label(current_frame, text="Last Save directory:").pack(anchor=tk.W)
+        self.last_save_var = tk.StringVar()
+        ttk.Entry(
+            current_frame,
+            textvariable=self.last_save_var,
+            state="readonly",
+            width=60
+        ).pack(fill=tk.X, pady=(2, 10))
+        
+        # Clear directories button
+        clear_button_frame = ttk.Frame(current_frame)
+        clear_button_frame.pack(fill=tk.X)
+        
+        ttk.Button(
+            clear_button_frame,
+            text="Clear Remembered Directories",
+            command=self._clear_remembered_directories
+        ).pack(side=tk.LEFT)
+        
+        # Info section
+        info_frame = ttk.LabelFrame(dialog_frame, text="Information", padding="10")
+        info_frame.pack(fill=tk.X)
+        
+        info_text = (
+            "• When directory memory is enabled, Open and Save dialogs will start in the last directory you used\n"
+            "• Open and Save directories are remembered separately\n"
+            "• Directories are only remembered if they still exist when you use them\n"
+            "• You can clear the remembered directories at any time using the button above"
+        )
+        
+        ttk.Label(
+            info_frame,
+            text=info_text,
+            wraplength=550,
+            justify=tk.LEFT,
+            font=("TkDefaultFont", 9)
+        ).pack(anchor=tk.W)
+    
+    def _clear_remembered_directories(self):
+        """Clear the remembered directories."""
+        result = messagebox.askyesno(
+            "Clear Directories",
+            "This will clear the remembered Open and Save directories.\n\nAre you sure?"
+        )
+        
+        if result:
+            # Clear the directories in preferences
+            self.prefs_manager.preferences.file_dialog_prefs.last_open_directory = ""
+            self.prefs_manager.preferences.file_dialog_prefs.last_save_directory = ""
+            self.prefs_manager.save_preferences()
+            
+            # Update the display
+            self.last_open_var.set("")
+            self.last_save_var.set("")
+            
+            messagebox.showinfo("Cleared", "Remembered directories have been cleared.")
+    
     def _load_current_settings(self):
         """Load current settings into the dialog."""
         prefs = self.prefs_manager.preferences.export_prefs
@@ -244,6 +342,17 @@ class PreferencesDialog:
         
         # Export behavior
         self.auto_open_var.set(prefs.auto_open_after_export)
+        
+        # File dialog preferences
+        dialog_prefs = self.prefs_manager.preferences.file_dialog_prefs
+        self.remember_directories_var.set(dialog_prefs.remember_directories)
+        
+        # Show current remembered directories
+        last_open = self.prefs_manager.get_last_open_directory()
+        self.last_open_var.set(last_open or "(none)")
+        
+        last_save = self.prefs_manager.get_last_save_directory()
+        self.last_save_var.set(last_save or "(none)")
         
         # Update preview
         self._update_filename_preview()
@@ -330,6 +439,9 @@ class PreferencesDialog:
             
             # Export behavior
             self.prefs_manager.preferences.export_prefs.auto_open_after_export = self.auto_open_var.get()
+            
+            # File dialog preferences
+            self.prefs_manager.set_remember_directories(self.remember_directories_var.get())
             
             # Save preferences
             success = self.prefs_manager.save_preferences()

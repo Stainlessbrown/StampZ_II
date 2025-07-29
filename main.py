@@ -154,7 +154,21 @@ class StampZApp:
         
         # Use provided filename, otherwise ask user
         if not filename:
-            filename = filedialog.askopenfilename(title="Open Image", filetypes=filetypes)
+            from utils.user_preferences import get_preferences_manager
+            prefs_manager = get_preferences_manager()
+            
+            # Get the last used directory for opening files
+            initial_dir = prefs_manager.get_last_open_directory()
+            
+            filename = filedialog.askopenfilename(
+                title="Open Image", 
+                filetypes=filetypes,
+                initialdir=initial_dir
+            )
+            
+            # Save the directory for next time if a file was selected
+            if filename:
+                prefs_manager.set_last_open_directory(filename)
 
         if filename:
             try:
@@ -215,12 +229,23 @@ class StampZApp:
                 use_dimensions=True
             )
 
+            from utils.user_preferences import get_preferences_manager
+            prefs_manager = get_preferences_manager()
+            
+            # Get the last used directory for saving files
+            initial_dir = prefs_manager.get_last_save_directory()
+            
             filepath = filedialog.asksaveasfilename(
                 title="Save Cropped Image",
                 defaultextension=default_ext,
                 initialfile=suggested_name,
-                filetypes=filetypes
+                filetypes=filetypes,
+                initialdir=initial_dir
             )
+            
+            # Save the directory for next time if a file was selected
+            if filepath:
+                prefs_manager.set_last_save_directory(filepath)
 
             if filepath:
                 ext = os.path.splitext(filepath)[1].lower()
