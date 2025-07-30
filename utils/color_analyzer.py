@@ -261,36 +261,44 @@ class ColorAnalyzer:
         width, height = coord.sample_size
         x, y = coord.x, coord.y
         
-        # Calculate bounds based on anchor position
+        # Convert from Cartesian coordinates (0,0 at bottom-left) to PIL coordinates (0,0 at top-left)
+        pil_y = image.height - y
+        
+        # Calculate bounds based on anchor position in PIL coordinate system
         if coord.anchor_position == 'center':
             left = int(x - width/2)
-            top = int(y - height/2)
+            top = int(pil_y - height/2)
             right = int(x + width/2)
-            bottom = int(y + height/2)
+            bottom = int(pil_y + height/2)
         elif coord.anchor_position == 'top_left':
-            left, top = int(x), int(y)
-            right, bottom = int(x + width), int(y + height)
+            # In Cartesian: top_left means higher Y value
+            # In PIL: this becomes lower Y value (closer to 0)
+            left, top = int(x), int(pil_y - height)
+            right, bottom = int(x + width), int(pil_y)
         elif coord.anchor_position == 'top_right':
             left = int(x - width)
-            top = int(y)
+            top = int(pil_y - height)
             right = int(x)
-            bottom = int(y + height)
+            bottom = int(pil_y)
         elif coord.anchor_position == 'bottom_left':
+            # In Cartesian: bottom_left means lower Y value
+            # In PIL: this becomes higher Y value
             left = int(x)
-            top = int(y - height)
+            top = int(pil_y)
             right = int(x + width)
-            bottom = int(y)
+            bottom = int(pil_y + height)
         else:  # bottom_right
             left = int(x - width)
-            top = int(y - height)
+            top = int(pil_y)
             right = int(x)
-            bottom = int(y)
+            bottom = int(pil_y + height)
         
         # Debug output after bounds calculation
         print(f"DEBUG: Sample area bounds calculation:")
-        print(f"  Center position: ({x}, {y})")
+        print(f"  Cartesian position: ({x}, {y})")
+        print(f"  PIL Y position: {pil_y}")
         print(f"  Sample size: {width}x{height}")
-        print(f"  Calculated bounds: ({left}, {top}, {right}, {bottom})")
+        print(f"  Calculated PIL bounds: ({left}, {top}, {right}, {bottom})")
         print(f"  Image dimensions: {image.width}x{image.height}")
         
         # Clamp to image bounds
@@ -319,10 +327,13 @@ class ColorAnalyzer:
         radius = coord.sample_size[0] / 2  # Use width as diameter
         x, y = coord.x, coord.y
         
+        # Convert from Cartesian coordinates (0,0 at bottom-left) to PIL coordinates (0,0 at top-left)
+        pil_y = image.height - y
+        
         left = int(x - radius)
-        top = int(y - radius)
+        top = int(pil_y - radius)
         right = int(x + radius)
-        bottom = int(y + radius)
+        bottom = int(pil_y + radius)
         
         # Clamp to image bounds
         left = max(0, left)
