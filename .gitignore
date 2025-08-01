@@ -35,5 +35,23 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# User data directories (created dynamically by app)
+exports/
+recent/
+
+# Test output files
+test_spectral_*.csv
+test_spectral_*.png
+
+# User databases (personal data, not starter data)
+data/coordinates.db
+data/color_analysis/*.db
+
+# Keep data/color_libraries/ but exclude specific user libraries
+# (basic_colors_library.db should be kept as starter data)
+data/color_libraries/*_library.db
+!data/color_libraries/basic_colors_library.db
+!data/color_libraries/philatelic_colors_library.db
+
 # Logs
 *.log
