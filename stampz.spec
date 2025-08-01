@@ -9,6 +9,15 @@ try:
 except Exception:
     datas, binaries, hiddenimports = [], [], []
 
+# Collect matplotlib data files and imports
+try:
+    matplotlib_datas, matplotlib_binaries, matplotlib_hiddenimports = collect_all('matplotlib')
+    datas += matplotlib_datas
+    binaries += matplotlib_binaries
+    hiddenimports += matplotlib_hiddenimports
+except Exception:
+    pass
+
 # Add additional hidden imports
 hiddenimports += [
     'PIL.Image',
@@ -29,6 +38,10 @@ hiddenimports += [
     '_tkinter',
     'numpy',
     'colorspacious',
+    'matplotlib',
+    'matplotlib.pyplot',
+    'matplotlib.backends.backend_tkagg',
+    'pandas',
     'odf.opendocument',
     'odf.table',
     'odf.text',

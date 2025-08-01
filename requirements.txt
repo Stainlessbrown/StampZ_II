@@ -4,5 +4,9 @@ Pillow==10.4.0
 odfpy==1.4.1
 colorspacious==1.1.2
 
+# Spectral analysis dependencies
+matplotlib==3.9.2
+pandas==2.2.3
+
 # Build dependencies
 pyinstaller==6.3.0

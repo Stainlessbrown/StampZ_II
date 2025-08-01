@@ -95,7 +95,9 @@ jobs:
           --icon=StampZ.icns \
           --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
           --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
-          --collect-all odfpy --add-data "resources:resources" --add-data "data:data" \
+          --hidden-import=matplotlib --hidden-import=matplotlib.pyplot --hidden-import=pandas \
+          --hidden-import=matplotlib.backends.backend_tkagg \
+          --collect-all odfpy --collect-all matplotlib --add-data "resources:resources" --add-data "data:data" \
           --runtime-hook runtime_hook.py main.py
         echo "macOS build completed. Checking dist directory:"
         ls -la dist/
@@ -108,7 +110,9 @@ jobs:
         python -m PyInstaller --onefile --windowed --name "StampZ_${{ matrix.name }}" `
           --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text `
           --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious `
-          --collect-all odfpy --add-data "resources;resources" --add-data "data;data" `
+          --hidden-import=matplotlib --hidden-import=matplotlib.pyplot --hidden-import=pandas `
+          --hidden-import=matplotlib.backends.backend_tkagg `
+          --collect-all odfpy --collect-all matplotlib --add-data "resources;resources" --add-data "data;data" `
           --runtime-hook runtime_hook.py main.py
         Write-Host "Windows build completed. Checking dist directory:"
         Get-ChildItem dist
