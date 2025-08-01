@@ -41,7 +41,7 @@ class SpectralAnalyzer:
     
     def _generate_d65_spd(self) -> Dict[float, float]:
         """Generate D65 standard illuminant spectral power distribution."""
-        wavelengths = np.arange(380, 701, 5)
+        wavelengths = np.arange(380, 751, 5)
         # Simplified D65 - actual would use CIE standard
         spd = {}
         for wl in wavelengths:
@@ -58,7 +58,7 @@ class SpectralAnalyzer:
     
     def _generate_illuminant_a(self) -> Dict[float, float]:
         """Generate Illuminant A (incandescent) SPD."""
-        wavelengths = np.arange(380, 701, 5)
+        wavelengths = np.arange(380, 751, 5)
         spd = {}
         for wl in wavelengths:
             # Planckian radiator at 2856K (simplified)
@@ -68,7 +68,7 @@ class SpectralAnalyzer:
     
     def _generate_f2_spd(self) -> Dict[float, float]:
         """Generate F2 fluorescent SPD with mercury peaks."""
-        wavelengths = np.arange(380, 701, 5)
+        wavelengths = np.arange(380, 751, 5)
         spd = {}
         mercury_peaks = [405, 436, 546, 578]  # Mercury emission lines
         
@@ -87,7 +87,7 @@ class SpectralAnalyzer:
     
     def _generate_led_spd(self) -> Dict[float, float]:
         """Generate modern LED SPD (blue peak + phosphor)."""
-        wavelengths = np.arange(380, 701, 5)
+        wavelengths = np.arange(380, 751, 5)
         spd = {}
         for wl in wavelengths:
             # Blue LED peak around 450nm
@@ -104,7 +104,7 @@ class SpectralAnalyzer:
     
     def _generate_rgb_responses(self) -> Dict[str, Dict[float, float]]:
         """Generate RGB sensor response curves."""
-        wavelengths = np.arange(380, 701, 5)
+        wavelengths = np.arange(380, 751, 5)
         responses = {'R': {}, 'G': {}, 'B': {}}
         
         for wl in wavelengths:
@@ -345,34 +345,61 @@ class SpectralAnalyzer:
             
             # Button callback functions
             def show_rgb_plot(event):
-                self._create_individual_plot(sample_data, 'rgb', original_sample_count)
+                # Auto-enable labels for small sample sets
+                with_labels = len(sample_data) <= 10
+                self._create_individual_plot(sample_data, 'rgb', original_sample_count, with_labels=with_labels)
             
             def show_rg_plot(event):
-                self._create_individual_plot(sample_data, 'rg_ratio', original_sample_count)
+                # Auto-enable labels for small sample sets
+                with_labels = len(sample_data) <= 10
+                self._create_individual_plot(sample_data, 'rg_ratio', original_sample_count, with_labels=with_labels)
             
             def show_bg_plot(event):
-                self._create_individual_plot(sample_data, 'bg_ratio', original_sample_count)
+                # Auto-enable labels for small sample sets
+                with_labels = len(sample_data) <= 10
+                self._create_individual_plot(sample_data, 'bg_ratio', original_sample_count, with_labels=with_labels)
             
             def show_dev_plot(event):
-                self._create_individual_plot(sample_data, 'deviation', original_sample_count)
+                # Auto-enable labels for small sample sets
+                with_labels = len(sample_data) <= 10
+                self._create_individual_plot(sample_data, 'deviation', original_sample_count, with_labels=with_labels)
+            
+            def show_few_labeled(event):
+                # Show just 5 samples with labels for identification
+                few_sample_data = {}
+                for i, (sample_id, data) in enumerate(sample_data.items()):
+                    if i >= 5:
+                        break
+                    few_sample_data[sample_id] = data
+                
+                # Create a multi-plot figure showing different analysis types with labels
+                self._create_labeled_multi_plot(few_sample_data, original_sample_count)
+            
+            def reset_view(event):
+                # Refresh the current plot
+                plt.close('all')
+                self.plot_spectral_response(spectral_data, sample_ids, max_samples, interactive, plot_type)
             
             # Connect buttons to callbacks
             btn_rgb.on_clicked(show_rgb_plot)
             btn_rg.on_clicked(show_rg_plot)
             btn_bg.on_clicked(show_bg_plot)
             btn_dev.on_clicked(show_dev_plot)
+            btn_few.on_clicked(show_few_labeled)
+            btn_all.on_clicked(reset_view)
             
             print("Interactive mode: Click buttons to pop out individual plots in new windows")
         
         plt.show()
     
-    def _create_individual_plot(self, sample_data: Dict, plot_type: str, total_samples: int) -> None:
+    def _create_individual_plot(self, sample_data: Dict, plot_type: str, total_samples: int, with_labels: bool = False) -> None:
         """Create an individual pop-out plot window.
         
         Args:
             sample_data: Dictionary of sample data
-            plot_type: Type of plot ('rgb', 'rg_ratio', 'bg_ratio', 'deviation')
+            plot_type: Type of plot ('rgb', 'rg_ratio', 'bg_ratio', 'deviation', 'labeled_overview')
             total_samples: Total number of samples in the dataset
+            with_labels: Whether to show sample labels for identification
         """
         # Create a new figure for the individual plot
         fig, ax = plt.subplots(1, 1, figsize=(14, 10))
@@ -419,8 +446,14 @@ class SpectralAnalyzer:
                     rg_ratio.append(ratio)
                 
                 color = plt.cm.viridis(sample_count / len(sample_data))
-                ax.plot(wavelengths, rg_ratio, alpha=0.7, color=color, linewidth=1.2)
+                if with_labels and len(sample_data) <= 10:  # Add labels for small sets
+                    ax.plot(wavelengths, rg_ratio, alpha=0.8, color=color, linewidth=2, label=sample_id)
+                else:
+                    ax.plot(wavelengths, rg_ratio, alpha=0.7, color=color, linewidth=1.2)
                 sample_count += 1
+            
+            if with_labels and len(sample_data) <= 10:
+                ax.legend(loc='upper right', fontsize=9)
                 
         elif plot_type == 'bg_ratio':
             # Blue/Green ratio plot
@@ -438,8 +471,14 @@ class SpectralAnalyzer:
                     bg_ratio.append(ratio)
                 
                 color = plt.cm.plasma(sample_count / len(sample_data))
-                ax.plot(wavelengths, bg_ratio, alpha=0.7, color=color, linewidth=1.2)
+                if with_labels and len(sample_data) <= 10:  # Add labels for small sets
+                    ax.plot(wavelengths, bg_ratio, alpha=0.8, color=color, linewidth=2, label=sample_id)
+                else:
+                    ax.plot(wavelengths, bg_ratio, alpha=0.7, color=color, linewidth=1.2)
                 sample_count += 1
+            
+            if with_labels and len(sample_data) <= 10:
+                ax.legend(loc='upper right', fontsize=9)
                 
         elif plot_type == 'deviation':
             # Channel deviation plot
@@ -458,8 +497,37 @@ class SpectralAnalyzer:
                     deviations.append(deviation)
                 
                 color = plt.cm.coolwarm(sample_count / len(sample_data))
-                ax.plot(wavelengths, deviations, alpha=0.7, color=color, linewidth=1.2)
+                if with_labels and len(sample_data) <= 10:  # Add labels for small sets
+                    ax.plot(wavelengths, deviations, alpha=0.8, color=color, linewidth=2, label=sample_id)
+                else:
+                    ax.plot(wavelengths, deviations, alpha=0.7, color=color, linewidth=1.2)
                 sample_count += 1
+            
+            if with_labels and len(sample_data) <= 10:
+                ax.legend(loc='upper right', fontsize=9)
+                
+        elif plot_type == 'labeled_overview':
+            # Overview with sample labels for identification
+            ax.set_title(f'Labeled Sample Overview - {len(sample_data)} Samples with R/G Ratio', fontsize=14)
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('R/G Ratio', fontsize=12)
+            
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                rg_ratio = []
+                wavelengths = data['wavelengths']
+                for i in range(len(data['r_response'])):
+                    r, g = data['r_response'][i], data['g_response'][i]
+                    ratio = r / (g + 0.001) if g > 0.001 else 0
+                    rg_ratio.append(ratio)
+                
+                color = plt.cm.Set1(sample_count % 9)  # Use distinct colors
+                line = ax.plot(wavelengths, rg_ratio, alpha=0.8, color=color, linewidth=2, label=sample_id)[0]
+                sample_lines.append(line)
+                sample_count += 1
+            
+            # Add legend with sample IDs
+            ax.legend(loc='upper right', fontsize=10)
         
         # Common formatting for all plots
         ax.grid(True, alpha=0.3)
@@ -471,6 +539,145 @@ class SpectralAnalyzer:
         plt.show()
         
         print(f"Opened individual {plot_type} plot in new window")
+    
+    def _create_labeled_multi_plot(self, sample_data: Dict, total_samples: int) -> None:
+        """Create a multi-plot figure with labels for sample identification.
+        
+        Args:
+            sample_data: Dictionary of sample data (should be limited to ~5 samples)
+            total_samples: Total number of samples in the original dataset
+        """
+        # Create a 2x2 subplot figure similar to the overview but with labels
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle(f'Labeled Spectral Analysis - {len(sample_data)} of {total_samples} Samples', fontsize=16)
+        
+        # Plot 1: RGB responses with labels
+        if sample_data:
+            axes[0, 0].set_title('RGB Response Curves (Labeled)', fontsize=12)
+            axes[0, 0].set_xlabel('Wavelength (nm)')
+            axes[0, 0].set_ylabel('Relative Response')
+            
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                color = plt.cm.Set1(sample_count % 9)
+                axes[0, 0].plot(data['wavelengths'], data['r_response'], 'r-', alpha=0.7, linewidth=1.5, label=f'{sample_id} (R)')
+                axes[0, 0].plot(data['wavelengths'], data['g_response'], 'g-', alpha=0.7, linewidth=1.5, label=f'{sample_id} (G)')
+                axes[0, 0].plot(data['wavelengths'], data['b_response'], 'b-', alpha=0.7, linewidth=1.5, label=f'{sample_id} (B)')
+                sample_count += 1
+            
+            axes[0, 0].legend(loc='upper right', fontsize=8, ncol=2)
+            axes[0, 0].grid(True, alpha=0.3)
+        
+        # Plot 2: R/G ratio with labels
+        axes[0, 1].set_title('Red/Green Ratio (Labeled)', fontsize=12)
+        axes[0, 1].set_xlabel('Wavelength (nm)')
+        axes[0, 1].set_ylabel('R/G Ratio')
+        
+        sample_count = 0
+        for sample_id, data in sample_data.items():
+            rg_ratio = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['r_response'])):
+                r, g = data['r_response'][i], data['g_response'][i]
+                ratio = r / (g + 0.001) if g > 0.001 else 0
+                rg_ratio.append(ratio)
+            
+            color = plt.cm.Set1(sample_count % 9)
+            axes[0, 1].plot(wavelengths, rg_ratio, alpha=0.8, color=color, linewidth=2, label=sample_id)
+            sample_count += 1
+        
+        axes[0, 1].legend(loc='upper right', fontsize=9)
+        axes[0, 1].grid(True, alpha=0.3)
+        
+        # Plot 3: B/G ratio with labels
+        axes[1, 0].set_title('Blue/Green Ratio (Labeled)', fontsize=12)
+        axes[1, 0].set_xlabel('Wavelength (nm)')
+        axes[1, 0].set_ylabel('B/G Ratio')
+        
+        sample_count = 0
+        for sample_id, data in sample_data.items():
+            bg_ratio = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['b_response'])):
+                b, g = data['b_response'][i], data['g_response'][i]
+                ratio = b / (g + 0.001) if g > 0.001 else 0
+                bg_ratio.append(ratio)
+            
+            color = plt.cm.Set1(sample_count % 9)
+            axes[1, 0].plot(wavelengths, bg_ratio, alpha=0.8, color=color, linewidth=2, label=sample_id)
+            sample_count += 1
+        
+        axes[1, 0].legend(loc='upper right', fontsize=9)
+        axes[1, 0].grid(True, alpha=0.3)
+        
+        # Plot 4: Channel deviation with labels
+        axes[1, 1].set_title('Channel Deviation (Labeled)', fontsize=12)
+        axes[1, 1].set_xlabel('Wavelength (nm)')
+        axes[1, 1].set_ylabel('Coefficient of Variation')
+        
+        sample_count = 0
+        for sample_id, data in sample_data.items():
+            deviations = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['r_response'])):
+                r, g, b = data['r_response'][i], data['g_response'][i], data['b_response'][i]
+                mean_response = (r + g + b) / 3
+                deviation = np.std([r, g, b]) / (mean_response + 0.001)
+                deviations.append(deviation)
+            
+            color = plt.cm.Set1(sample_count % 9)
+            axes[1, 1].plot(wavelengths, deviations, alpha=0.8, color=color, linewidth=2, label=sample_id)
+            sample_count += 1
+        
+        axes[1, 1].legend(loc='upper right', fontsize=9)
+        axes[1, 1].grid(True, alpha=0.3)
+        
+        # Add overall info
+        fig.text(0.02, 0.02, f'Labeled Analysis: {len(sample_data)} samples shown with individual identification', 
+                 fontsize=10, style='italic')
+        
+        # Add interactive buttons for labeled pop-outs
+        from matplotlib.widgets import Button
+        
+        # Adjust layout to make room for buttons
+        fig.subplots_adjust(bottom=0.12)
+        
+        # Create button axes for labeled multi-plot
+        ax_btn1 = plt.axes([0.1, 0.02, 0.15, 0.04])
+        ax_btn2 = plt.axes([0.3, 0.02, 0.15, 0.04])
+        ax_btn3 = plt.axes([0.5, 0.02, 0.15, 0.04])
+        ax_btn4 = plt.axes([0.7, 0.02, 0.15, 0.04])
+        
+        # Create buttons for labeled individual plots
+        btn_rgb_labeled = Button(ax_btn1, 'Pop-out RGB (Labeled)')
+        btn_rg_labeled = Button(ax_btn2, 'Pop-out R/G (Labeled)')
+        btn_bg_labeled = Button(ax_btn3, 'Pop-out B/G (Labeled)')
+        btn_dev_labeled = Button(ax_btn4, 'Pop-out Dev (Labeled)')
+        
+        # Button callback functions that preserve labels
+        def show_rgb_labeled(event):
+            self._create_individual_plot(sample_data, 'rgb', total_samples, with_labels=True)
+        
+        def show_rg_labeled(event):
+            self._create_individual_plot(sample_data, 'rg_ratio', total_samples, with_labels=True)
+        
+        def show_bg_labeled(event):
+            self._create_individual_plot(sample_data, 'bg_ratio', total_samples, with_labels=True)
+        
+        def show_dev_labeled(event):
+            self._create_individual_plot(sample_data, 'deviation', total_samples, with_labels=True)
+        
+        # Connect buttons to callbacks
+        btn_rgb_labeled.on_clicked(show_rgb_labeled)
+        btn_rg_labeled.on_clicked(show_rg_labeled)
+        btn_bg_labeled.on_clicked(show_bg_labeled)
+        btn_dev_labeled.on_clicked(show_dev_labeled)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print(f"Opened labeled multi-plot with {len(sample_data)} samples")
+        print("Click buttons to pop out individual labeled plots")
     
     def calculate_metamerism_index(self, measurement1: ColorMeasurement,
                                  measurement2: ColorMeasurement) -> float:
