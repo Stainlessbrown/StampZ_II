@@ -170,13 +170,15 @@ class SpectralAnalyzer:
         return spectral_data
     
     def plot_spectral_response(self, spectral_data: List[SpectralMeasurement], 
-                             sample_ids: Optional[List[str]] = None) -> None:
+                             sample_ids: Optional[List[str]] = None, 
+                             max_samples: int = 20) -> None:
         """
         Plot spectral response curves for analyzed samples.
         
         Args:
             spectral_data: List of SpectralMeasurement objects
             sample_ids: Optional list of specific sample IDs to plot
+            max_samples: Maximum number of samples to plot (default 20 for readability)
         """
         if not spectral_data:
             print("No spectral data to plot")
@@ -201,9 +203,20 @@ class SpectralAnalyzer:
             sample_data[measurement.sample_id]['g_response'].append(measurement.relative_response[1])
             sample_data[measurement.sample_id]['b_response'].append(measurement.relative_response[2])
         
-        # Create plots
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Spectral Response Analysis', fontsize=16)
+        # Limit number of samples for readability
+        original_sample_count = len(sample_data)
+        if len(sample_data) > max_samples:
+            print(f"Note: Displaying first {max_samples} of {original_sample_count} samples for readability")
+            limited_sample_data = {}
+            for i, (sample_id, data) in enumerate(sample_data.items()):
+                if i >= max_samples:
+                    break
+                limited_sample_data[sample_id] = data
+            sample_data = limited_sample_data
+        
+        # Create plots with larger figure size for better readability
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle(f'Spectral Response Analysis ({len(sample_data)} of {original_sample_count} samples)', fontsize=16)
         
         # Plot 1: All RGB responses for first sample
         if sample_data:
@@ -219,8 +232,9 @@ class SpectralAnalyzer:
             axes[0, 0].legend()
             axes[0, 0].grid(True, alpha=0.3)
         
-        # Plot 2: R/G ratio across spectrum
+        # Plot 2: R/G ratio across spectrum (no legend for multiple samples)
         axes[0, 1].set_title('Red/Green Ratio vs Wavelength')
+        sample_count = 0
         for sample_id, data in sample_data.items():
             rg_ratio = []
             wavelengths = data['wavelengths']
@@ -228,14 +242,21 @@ class SpectralAnalyzer:
                 r, g = data['r_response'][i], data['g_response'][i]
                 ratio = r / (g + 0.001) if g > 0.001 else 0  # Avoid division by zero
                 rg_ratio.append(ratio)
-            axes[0, 1].plot(wavelengths, rg_ratio, label=sample_id, alpha=0.7)
+            
+            # Use color map for better distinction
+            color = plt.cm.viridis(sample_count / len(sample_data))
+            axes[0, 1].plot(wavelengths, rg_ratio, alpha=0.6, color=color, linewidth=0.8)
+            sample_count += 1
+        
         axes[0, 1].set_xlabel('Wavelength (nm)')
         axes[0, 1].set_ylabel('R/G Ratio')
-        axes[0, 1].legend()
         axes[0, 1].grid(True, alpha=0.3)
+        axes[0, 1].text(0.02, 0.98, f'{len(sample_data)} samples', transform=axes[0, 1].transAxes, 
+                        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
-        # Plot 3: B/G ratio across spectrum
+        # Plot 3: B/G ratio across spectrum (no legend for multiple samples)
         axes[1, 0].set_title('Blue/Green Ratio vs Wavelength')
+        sample_count = 0
         for sample_id, data in sample_data.items():
             bg_ratio = []
             wavelengths = data['wavelengths']
@@ -243,14 +264,21 @@ class SpectralAnalyzer:
                 b, g = data['b_response'][i], data['g_response'][i]
                 ratio = b / (g + 0.001) if g > 0.001 else 0
                 bg_ratio.append(ratio)
-            axes[1, 0].plot(wavelengths, bg_ratio, label=sample_id, alpha=0.7)
+            
+            # Use color map for better distinction
+            color = plt.cm.plasma(sample_count / len(sample_data))
+            axes[1, 0].plot(wavelengths, bg_ratio, alpha=0.6, color=color, linewidth=0.8)
+            sample_count += 1
+        
         axes[1, 0].set_xlabel('Wavelength (nm)')
         axes[1, 0].set_ylabel('B/G Ratio')
-        axes[1, 0].legend()
         axes[1, 0].grid(True, alpha=0.3)
+        axes[1, 0].text(0.02, 0.98, f'{len(sample_data)} samples', transform=axes[1, 0].transAxes, 
+                        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
-        # Plot 4: Spectral deviation analysis
+        # Plot 4: Spectral deviation analysis (no legend for multiple samples)
         axes[1, 1].set_title('Channel Deviation Across Spectrum')
+        sample_count = 0
         for sample_id, data in sample_data.items():
             deviations = []
             wavelengths = data['wavelengths']
@@ -259,13 +287,24 @@ class SpectralAnalyzer:
                 mean_response = (r + g + b) / 3
                 deviation = np.std([r, g, b]) / (mean_response + 0.001)
                 deviations.append(deviation)
-            axes[1, 1].plot(wavelengths, deviations, label=sample_id, alpha=0.7)
+            
+            # Use color map for better distinction
+            color = plt.cm.coolwarm(sample_count / len(sample_data))
+            axes[1, 1].plot(wavelengths, deviations, alpha=0.6, color=color, linewidth=0.8)
+            sample_count += 1
+        
         axes[1, 1].set_xlabel('Wavelength (nm)')
         axes[1, 1].set_ylabel('Coefficient of Variation')
-        axes[1, 1].legend()
         axes[1, 1].grid(True, alpha=0.3)
+        axes[1, 1].text(0.02, 0.98, f'{len(sample_data)} samples', transform=axes[1, 1].transAxes, 
+                        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Add overall statistics text
+        fig.text(0.02, 0.02, f'Analysis: {original_sample_count} total samples, showing {len(sample_data)} for clarity', 
+                 fontsize=10, style='italic')
         
         plt.tight_layout()
+        plt.subplots_adjust(bottom=0.05)  # Make room for bottom text
         plt.show()
     
     def calculate_metamerism_index(self, measurement1: ColorMeasurement, 
