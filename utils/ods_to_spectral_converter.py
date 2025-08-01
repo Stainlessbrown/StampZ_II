@@ -232,10 +232,18 @@ def run_spectral_analysis(measurements: List[ColorMeasurement], dataset_name: st
             print("\nGenerating spectral response plots...")
             d65_data = spectral_results.get('D65', [])
             if d65_data:
+                # Set up plot saving
+                plot_filename = os.path.join(output_dir, f"{dataset_name}_spectral_plot_{datetime.now().strftime('%Y%m%d')}.png")
+                spectral_analyzer._save_plot_path = plot_filename
+                
                 # Limit plotting to reasonable number of samples for readability
                 plot_samples = min(20, len(measurements))
                 spectral_analyzer.plot_spectral_response(d65_data, max_samples=plot_samples)
-                print(f"Spectral response plots generated! (showing {plot_samples} of {len(measurements)} samples)")
+                print(f"Spectral response plots generated and saved to {os.path.basename(plot_filename)}!")
+                print(f"(showing {plot_samples} of {len(measurements)} samples)")
+                
+                # Clean up the save path attribute
+                del spectral_analyzer._save_plot_path
         except ImportError:
             print("Install matplotlib to generate plots: pip install matplotlib")
         except Exception as e:

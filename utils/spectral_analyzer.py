@@ -305,6 +305,15 @@ class SpectralAnalyzer:
         
         plt.tight_layout()
         plt.subplots_adjust(bottom=0.05)  # Make room for bottom text
+        
+        # Save the plot if requested
+        if hasattr(self, '_save_plot_path') and self._save_plot_path:
+            try:
+                plt.savefig(self._save_plot_path, dpi=300, bbox_inches='tight')
+                print(f"Plot saved to: {self._save_plot_path}")
+            except Exception as e:
+                print(f"Failed to save plot: {e}")
+        
         plt.show()
     
     def calculate_metamerism_index(self, measurement1: ColorMeasurement, 

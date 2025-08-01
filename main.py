@@ -1555,17 +1555,83 @@ class StampZApp:
             
             def plot_spectral_curves():
                 try:
+                    from tkinter import filedialog
+                    from datetime import datetime
+                    
                     spectral_analyzer = SpectralAnalyzer()
                     spectral_data = spectral_analyzer.analyze_spectral_response(measurements, 'D65')
+                    
+                    # Ask user if they want to save the plot
+                    save_plot = messagebox.askyesno(
+                        "Save Plot?",
+                        "Would you like to save the spectral plot as an image file?"
+                    )
+                    
+                    if save_plot:
+                        default_plot_name = f"{current_sample_set}_spectral_plot_{datetime.now().strftime('%Y%m%d')}.png"
+                        plot_filepath = filedialog.asksaveasfilename(
+                            title="Save Spectral Plot",
+                            defaultextension=".png",
+                            filetypes=[
+                                ('PNG files', '*.png'),
+                                ('SVG files', '*.svg'),
+                                ('PDF files', '*.pdf'),
+                                ('All files', '*.*')
+                            ],
+                            initialfile=default_plot_name
+                        )
+                        
+                        if plot_filepath:
+                            spectral_analyzer._save_plot_path = plot_filepath
+                    
                     spectral_analyzer.plot_spectral_response(spectral_data)
+                    
+                    if save_plot and hasattr(spectral_analyzer, '_save_plot_path'):
+                        del spectral_analyzer._save_plot_path  # Clean up
+                        
                 except ImportError:
                     messagebox.showwarning("Missing Dependency", "Install matplotlib to generate spectral plots:\npip install matplotlib")
                 except Exception as e:
                     messagebox.showerror("Plot Error", f"Failed to generate plots:\n{str(e)}")
             
+            def export_csv_data():
+                try:
+                    from tkinter import filedialog
+                    from datetime import datetime
+                    
+                    # Generate spectral data for CSV export
+                    spectral_analyzer = SpectralAnalyzer()
+                    spectral_data = spectral_analyzer.analyze_spectral_response(measurements, 'D65')
+                    
+                    default_csv_name = f"{current_sample_set}_spectral_data_{datetime.now().strftime('%Y%m%d')}.csv"
+                    
+                    csv_filepath = filedialog.asksaveasfilename(
+                        title="Export Spectral Data CSV",
+                        defaultextension=".csv",
+                        filetypes=[
+                            ('CSV files', '*.csv'),
+                            ('All files', '*.*')
+                        ],
+                        initialfile=default_csv_name
+                    )
+                    
+                    if csv_filepath:
+                        success = spectral_analyzer.export_spectral_analysis(spectral_data, csv_filepath)
+                        if success:
+                            messagebox.showinfo(
+                                "CSV Export Complete", 
+                                f"Detailed spectral data exported to:\n{csv_filepath}"
+                            )
+                        else:
+                            messagebox.showerror("CSV Export Error", "Failed to export spectral data CSV")
+                            
+                except Exception as e:
+                    messagebox.showerror("CSV Export Error", f"Failed to export CSV data:\n{str(e)}")
+            
             # Add buttons
             Button(button_frame, text="Run Analysis", command=run_analysis, font=("Arial", 10, "bold")).pack(side="left", padx=5)
             Button(button_frame, text="Export Results", command=export_results).pack(side="left", padx=5)
+            Button(button_frame, text="Export CSV Data", command=export_csv_data).pack(side="left", padx=5)
             Button(button_frame, text="Plot Curves", command=plot_spectral_curves).pack(side="left", padx=5)
             Button(button_frame, text="Close", command=dialog.destroy).pack(side="right", padx=5)
             
