@@ -171,7 +171,9 @@ class SpectralAnalyzer:
     
     def plot_spectral_response(self, spectral_data: List[SpectralMeasurement], 
                              sample_ids: Optional[List[str]] = None, 
-                             max_samples: int = 20) -> None:
+                             max_samples: int = 20, 
+                             interactive: bool = False, 
+                             plot_type: str = 'overview') -> None:
         """
         Plot spectral response curves for analyzed samples.
         
@@ -179,6 +181,8 @@ class SpectralAnalyzer:
             spectral_data: List of SpectralMeasurement objects
             sample_ids: Optional list of specific sample IDs to plot
             max_samples: Maximum number of samples to plot (default 20 for readability)
+            interactive: Enable interactive plotting with navigation controls
+            plot_type: Type of plot - 'overview', 'rg_ratio', 'bg_ratio', 'deviation', or 'individual'
         """
         if not spectral_data:
             print("No spectral data to plot")
@@ -314,9 +318,161 @@ class SpectralAnalyzer:
             except Exception as e:
                 print(f"Failed to save plot: {e}")
         
+        # Add interactive options if requested
+        if interactive:
+            # Add buttons for interactive functionality
+            from matplotlib.widgets import Button
+            import matplotlib.gridspec as gridspec
+            
+            # Adjust layout to make room for buttons
+            fig.subplots_adjust(bottom=0.15)
+            
+            # Create button axes
+            ax_btn1 = plt.axes([0.05, 0.08, 0.12, 0.04])
+            ax_btn2 = plt.axes([0.2, 0.08, 0.12, 0.04])
+            ax_btn3 = plt.axes([0.35, 0.08, 0.12, 0.04])
+            ax_btn4 = plt.axes([0.5, 0.08, 0.12, 0.04])
+            ax_btn5 = plt.axes([0.65, 0.08, 0.15, 0.04])
+            ax_btn6 = plt.axes([0.82, 0.08, 0.15, 0.04])
+            
+            # Create buttons
+            btn_rgb = Button(ax_btn1, 'Pop-out RGB')
+            btn_rg = Button(ax_btn2, 'Pop-out R/G')
+            btn_bg = Button(ax_btn3, 'Pop-out B/G')
+            btn_dev = Button(ax_btn4, 'Pop-out Deviation')
+            btn_few = Button(ax_btn5, 'Show 5 w/Labels')
+            btn_all = Button(ax_btn6, 'Reset View')
+            
+            # Button callback functions
+            def show_rgb_plot(event):
+                self._create_individual_plot(sample_data, 'rgb', original_sample_count)
+            
+            def show_rg_plot(event):
+                self._create_individual_plot(sample_data, 'rg_ratio', original_sample_count)
+            
+            def show_bg_plot(event):
+                self._create_individual_plot(sample_data, 'bg_ratio', original_sample_count)
+            
+            def show_dev_plot(event):
+                self._create_individual_plot(sample_data, 'deviation', original_sample_count)
+            
+            # Connect buttons to callbacks
+            btn_rgb.on_clicked(show_rgb_plot)
+            btn_rg.on_clicked(show_rg_plot)
+            btn_bg.on_clicked(show_bg_plot)
+            btn_dev.on_clicked(show_dev_plot)
+            
+            print("Interactive mode: Click buttons to pop out individual plots in new windows")
+        
         plt.show()
     
-    def calculate_metamerism_index(self, measurement1: ColorMeasurement, 
+    def _create_individual_plot(self, sample_data: Dict, plot_type: str, total_samples: int) -> None:
+        """Create an individual pop-out plot window.
+        
+        Args:
+            sample_data: Dictionary of sample data
+            plot_type: Type of plot ('rgb', 'rg_ratio', 'bg_ratio', 'deviation')
+            total_samples: Total number of samples in the dataset
+        """
+        # Create a new figure for the individual plot
+        fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+        
+        # Add interactive functionality for sample identification
+        sample_lines = []  # Store line objects for hover functionality
+        
+        if plot_type == 'rgb':
+            # RGB response curves for all samples
+            ax.set_title(f'RGB Response Curves - All {len(sample_data)} Samples', fontsize=14)
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('Relative Response', fontsize=12)
+            
+            # Plot all samples with different colors for R, G, B
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                alpha = max(0.3, 1.0 / len(sample_data))  # Adjust transparency based on sample count
+                color_base = plt.cm.viridis(sample_count / len(sample_data))
+                
+                ax.plot(data['wavelengths'], data['r_response'], 'r-', alpha=alpha, linewidth=1)
+                ax.plot(data['wavelengths'], data['g_response'], 'g-', alpha=alpha, linewidth=1)
+                ax.plot(data['wavelengths'], data['b_response'], 'b-', alpha=alpha, linewidth=1)
+                sample_count += 1
+            
+            # Add legend for RGB channels
+            ax.plot([], [], 'r-', label='Red Channel', linewidth=2)
+            ax.plot([], [], 'g-', label='Green Channel', linewidth=2)
+            ax.plot([], [], 'b-', label='Blue Channel', linewidth=2)
+            ax.legend()
+            
+        elif plot_type == 'rg_ratio':
+            # Red/Green ratio plot
+            ax.set_title(f'Red/Green Ratio vs Wavelength - All {len(sample_data)} Samples', fontsize=14)
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('R/G Ratio', fontsize=12)
+            
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                rg_ratio = []
+                wavelengths = data['wavelengths']
+                for i in range(len(data['r_response'])):
+                    r, g = data['r_response'][i], data['g_response'][i]
+                    ratio = r / (g + 0.001) if g > 0.001 else 0
+                    rg_ratio.append(ratio)
+                
+                color = plt.cm.viridis(sample_count / len(sample_data))
+                ax.plot(wavelengths, rg_ratio, alpha=0.7, color=color, linewidth=1.2)
+                sample_count += 1
+                
+        elif plot_type == 'bg_ratio':
+            # Blue/Green ratio plot
+            ax.set_title(f'Blue/Green Ratio vs Wavelength - All {len(sample_data)} Samples', fontsize=14)
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('B/G Ratio', fontsize=12)
+            
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                bg_ratio = []
+                wavelengths = data['wavelengths']
+                for i in range(len(data['b_response'])):
+                    b, g = data['b_response'][i], data['g_response'][i]
+                    ratio = b / (g + 0.001) if g > 0.001 else 0
+                    bg_ratio.append(ratio)
+                
+                color = plt.cm.plasma(sample_count / len(sample_data))
+                ax.plot(wavelengths, bg_ratio, alpha=0.7, color=color, linewidth=1.2)
+                sample_count += 1
+                
+        elif plot_type == 'deviation':
+            # Channel deviation plot
+            ax.set_title(f'Channel Deviation Across Spectrum - All {len(sample_data)} Samples', fontsize=14)
+            ax.set_xlabel('Wavelength (nm)', fontsize=12)
+            ax.set_ylabel('Coefficient of Variation', fontsize=12)
+            
+            sample_count = 0
+            for sample_id, data in sample_data.items():
+                deviations = []
+                wavelengths = data['wavelengths']
+                for i in range(len(data['r_response'])):
+                    r, g, b = data['r_response'][i], data['g_response'][i], data['b_response'][i]
+                    mean_response = (r + g + b) / 3
+                    deviation = np.std([r, g, b]) / (mean_response + 0.001)
+                    deviations.append(deviation)
+                
+                color = plt.cm.coolwarm(sample_count / len(sample_data))
+                ax.plot(wavelengths, deviations, alpha=0.7, color=color, linewidth=1.2)
+                sample_count += 1
+        
+        # Common formatting for all plots
+        ax.grid(True, alpha=0.3)
+        ax.text(0.02, 0.98, f'{len(sample_data)} of {total_samples} samples shown', 
+                transform=ax.transAxes, verticalalignment='top', 
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print(f"Opened individual {plot_type} plot in new window")
+    
+    def calculate_metamerism_index(self, measurement1: ColorMeasurement,
                                  measurement2: ColorMeasurement) -> float:
         """
         Calculate metamerism index between two color measurements.
