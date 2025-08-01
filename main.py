@@ -99,6 +99,8 @@ class StampZApp:
         self.color_menu.add_separator()
         self.color_menu.add_command(label="Create Standard Libraries", command=self.create_standard_libraries)
         self.color_menu.add_separator()
+        self.color_menu.add_command(label="Spectral Analysis...", command=self.open_spectral_analysis)
+        self.color_menu.add_separator()
         self.color_menu.add_command(label="Export Analysis with Library Matches...", command=self.export_with_library_matches)
 
         self.help_menu = tk.Menu(self.menubar, tearoff=0)
@@ -1362,6 +1364,232 @@ class StampZApp:
             messagebox.showerror(
                 "Export Error",
                 f"Failed to export analysis:\n\n{str(e)}"
+            )
+
+    def open_spectral_analysis(self):
+        """Open spectral analysis dialog for current color measurements."""
+        try:
+            from utils.spectral_analyzer import SpectralAnalyzer, analyze_spectral_deviation_from_measurements
+            from utils.color_analyzer import ColorAnalyzer
+            from tkinter import Toplevel, Text, Scrollbar, Button, Frame, messagebox
+            
+            # Check if we have color measurement data
+            current_sample_set = None
+            if (hasattr(self, 'control_panel') and 
+                hasattr(self.control_panel, 'sample_set_name') and 
+                self.control_panel.sample_set_name.get().strip()):
+                current_sample_set = self.control_panel.sample_set_name.get().strip()
+            
+            # Try to get measurements from current data or database
+            measurements = []
+            
+            if current_sample_set and self.current_file:
+                # Get measurements from database for current sample set
+                try:
+                    analyzer = ColorAnalyzer()
+                    measurements = analyzer.get_color_measurements(current_sample_set)
+                except Exception as e:
+                    print(f"Could not load measurements from database: {e}")
+            
+            if not measurements:
+                messagebox.showwarning(
+                    "No Data",
+                    "No color measurement data found for spectral analysis.\n\n"
+                    "Please run color analysis first using the Sample tool."
+                )
+                return
+            
+            # Create spectral analysis dialog
+            dialog = Toplevel(self.root)
+            dialog.title(f"Spectral Analysis - {current_sample_set}")
+            dialog.geometry("800x600")
+            dialog.resizable(True, True)
+            
+            # Center dialog
+            dialog.transient(self.root)
+            dialog.grab_set()
+            
+            # Create text area with scrollbar for results
+            text_frame = Frame(dialog)
+            text_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            text_area = Text(text_frame, wrap="word", font=("Courier", 11))
+            scrollbar = Scrollbar(text_frame, orient="vertical", command=text_area.yview)
+            text_area.configure(yscrollcommand=scrollbar.set)
+            
+            text_area.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            
+            # Button frame
+            button_frame = Frame(dialog)
+            button_frame.pack(fill="x", padx=10, pady=5)
+            
+            def run_analysis():
+                text_area.delete(1.0, "end")
+                text_area.insert("end", f"=== SPECTRAL ANALYSIS FOR {current_sample_set} ===\n")
+                text_area.insert("end", f"Analyzing {len(measurements)} color measurements...\n\n")
+                text_area.update()
+                
+                try:
+                    # Initialize spectral analyzer
+                    spectral_analyzer = SpectralAnalyzer()
+                    
+                    # Perform wavelength deviation analysis
+                    text_area.insert("end", "WAVELENGTH DEVIATION ANALYSIS\n")
+                    text_area.insert("end", "=" * 40 + "\n")
+                    text_area.insert("end", "This shows how RGB channels deviate across spectral regions:\n\n")
+                    text_area.update()
+                    
+                    # Capture the analysis output
+                    import io
+                    import contextlib
+                    
+                    # Redirect stdout to capture print statements
+                    old_stdout = __import__('sys').stdout
+                    captured_output = io.StringIO()
+                    
+                    try:
+                        __import__('sys').stdout = captured_output
+                        analyze_spectral_deviation_from_measurements(measurements)
+                        captured_text = captured_output.getvalue()
+                        text_area.insert("end", captured_text)
+                    finally:
+                        __import__('sys').stdout = old_stdout
+                    
+                    text_area.insert("end", "\n" + "=" * 60 + "\n\n")
+                    
+                    # Generate spectral response analysis
+                    text_area.insert("end", "SPECTRAL RESPONSE ANALYSIS\n")
+                    text_area.insert("end", "=" * 40 + "\n")
+                    text_area.update()
+                    
+                    illuminants = ['D65', 'A', 'F2']  # Daylight, Incandescent, Fluorescent
+                    
+                    for illuminant in illuminants:
+                        text_area.insert("end", f"\n--- Analysis under {illuminant} illuminant ---\n")
+                        spectral_data = spectral_analyzer.analyze_spectral_response(measurements, illuminant)
+                        
+                        sample_count = len(set(m.sample_id for m in spectral_data))
+                        wavelength_count = len(set(m.wavelength for m in spectral_data))
+                        
+                        text_area.insert("end", f"Generated {len(spectral_data)} spectral measurements\n")
+                        text_area.insert("end", f"Covers {sample_count} samples across {wavelength_count} wavelength points\n")
+                        
+                        if spectral_data:
+                            sample_1_data = [m for m in spectral_data if m.sample_id == 'sample_1']
+                            if sample_1_data:
+                                text_area.insert("end", f"Spectral range: {min(m.wavelength for m in sample_1_data):.0f}-{max(m.wavelength for m in sample_1_data):.0f}nm\n")
+                                
+                                max_r = max(sample_1_data, key=lambda m: m.rgb_response[0])
+                                max_g = max(sample_1_data, key=lambda m: m.rgb_response[1])
+                                max_b = max(sample_1_data, key=lambda m: m.rgb_response[2])
+                                
+                                text_area.insert("end", f"Peak responses - R: {max_r.wavelength:.0f}nm, G: {max_g.wavelength:.0f}nm, B: {max_b.wavelength:.0f}nm\n")
+                        text_area.update()
+                    
+                    # Metamerism analysis
+                    text_area.insert("end", "\n" + "=" * 60 + "\n")
+                    text_area.insert("end", "METAMERISM ANALYSIS\n")
+                    text_area.insert("end", "=" * 40 + "\n")
+                    text_area.insert("end", "Analyzing how colors appear under different lighting...\n\n")
+                    text_area.update()
+                    
+                    # Compare first few measurements for metamerism
+                    sample_limit = min(4, len(measurements))
+                    for i in range(sample_limit):
+                        for j in range(i+1, sample_limit):
+                            metamerism_index = spectral_analyzer.calculate_metamerism_index(measurements[i], measurements[j])
+                            
+                            text_area.insert("end", f"Sample {i+1} vs Sample {j+1}: Metamerism Index = {metamerism_index:.3f}\n")
+                            if metamerism_index > 2.0:
+                                text_area.insert("end", "  → High metamerism - colors may appear different under various lights\n")
+                            elif metamerism_index > 1.0:
+                                text_area.insert("end", "  → Moderate metamerism - some color shift possible\n")
+                            else:
+                                text_area.insert("end", "  → Low metamerism - colors should appear consistent\n")
+                            text_area.update()
+                    
+                    text_area.insert("end", "\n" + "=" * 60 + "\n")
+                    text_area.insert("end", "PRACTICAL APPLICATIONS\n")
+                    text_area.insert("end", "=" * 40 + "\n")
+                    text_area.insert("end", "This spectral analysis can help you:\n")
+                    text_area.insert("end", "• Identify pigments with unique spectral signatures\n")
+                    text_area.insert("end", "• Detect printing method differences (line-engraved vs lithographic)\n")
+                    text_area.insert("end", "• Analyze paper aging effects on color reproduction\n")
+                    text_area.insert("end", "• Compare stamps printed in different eras with different inks\n")
+                    text_area.insert("end", "• Identify potential forgeries through spectral inconsistencies\n")
+                    text_area.insert("end", "• Optimize photography lighting for accurate color capture\n\n")
+                    
+                    text_area.insert("end", "Analysis complete!\n")
+                    text_area.see("end")
+                    
+                except Exception as e:
+                    text_area.insert("end", f"\nError during spectral analysis: {str(e)}\n")
+                    import traceback
+                    text_area.insert("end", traceback.format_exc())
+            
+            def export_results():
+                try:
+                    from tkinter import filedialog
+                    from datetime import datetime
+                    
+                    default_filename = f"spectral_analysis_{current_sample_set}_{datetime.now().strftime('%Y%m%d')}.txt"
+                    
+                    filepath = filedialog.asksaveasfilename(
+                        title="Export Spectral Analysis",
+                        defaultextension=".txt",
+                        filetypes=[
+                            ('Text files', '*.txt'),
+                            ('All files', '*.*')
+                        ],
+                        initialfile=default_filename
+                    )
+                    
+                    if filepath:
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(text_area.get(1.0, "end"))
+                        messagebox.showinfo("Export Complete", f"Spectral analysis exported to:\n{filepath}")
+                        
+                except Exception as e:
+                    messagebox.showerror("Export Error", f"Failed to export analysis:\n{str(e)}")
+            
+            def plot_spectral_curves():
+                try:
+                    spectral_analyzer = SpectralAnalyzer()
+                    spectral_data = spectral_analyzer.analyze_spectral_response(measurements, 'D65')
+                    spectral_analyzer.plot_spectral_response(spectral_data)
+                except ImportError:
+                    messagebox.showwarning("Missing Dependency", "Install matplotlib to generate spectral plots:\npip install matplotlib")
+                except Exception as e:
+                    messagebox.showerror("Plot Error", f"Failed to generate plots:\n{str(e)}")
+            
+            # Add buttons
+            Button(button_frame, text="Run Analysis", command=run_analysis, font=("Arial", 10, "bold")).pack(side="left", padx=5)
+            Button(button_frame, text="Export Results", command=export_results).pack(side="left", padx=5)
+            Button(button_frame, text="Plot Curves", command=plot_spectral_curves).pack(side="left", padx=5)
+            Button(button_frame, text="Close", command=dialog.destroy).pack(side="right", padx=5)
+            
+            # Initial message
+            text_area.insert("end", f"Spectral Analysis Tool\n")
+            text_area.insert("end", f"Sample Set: {current_sample_set}\n")
+            text_area.insert("end", f"Measurements: {len(measurements)}\n\n")
+            text_area.insert("end", "Click 'Run Analysis' to analyze RGB channel behavior across the visible spectrum (380-700nm).\n\n")
+            text_area.insert("end", "This analysis will show:\n")
+            text_area.insert("end", "• How RGB channels deviate across wavelength ranges\n")
+            text_area.insert("end", "• Spectral response characteristics under different illuminants\n")
+            text_area.insert("end", "• Metamerism analysis (color appearance under different lights)\n")
+            text_area.insert("end", "• Practical applications for philatelic analysis\n\n")
+            
+        except ImportError as e:
+            messagebox.showerror(
+                "Missing Component",
+                f"Spectral analysis not available:\n\n{str(e)}\n\n"
+                "Please ensure the spectral analyzer module is properly installed."
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to open spectral analysis:\n\n{str(e)}"
             )
 
     def open_preferences(self):
