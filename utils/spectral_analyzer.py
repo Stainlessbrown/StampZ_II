@@ -1,0 +1,447 @@
+#!/usr/bin/env python3
+"""
+Spectral response analysis for StampZ.
+Analyze how RGB channels respond across the visible light spectrum.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import List, Tuple, Dict, Optional
+from dataclasses import dataclass
+import sqlite3
+from PIL import Image
+
+from .color_analyzer import ColorAnalyzer, ColorMeasurement, PrintType
+
+@dataclass
+class SpectralMeasurement:
+    """Represents spectral analysis data for a color sample."""
+    wavelength: float  # nm
+    rgb_response: Tuple[float, float, float]
+    relative_response: Tuple[float, float, float]  # Normalized to peak
+    sample_id: str
+    illuminant: str = "D65"  # Standard daylight
+
+class SpectralAnalyzer:
+    """Analyze spectral response characteristics of color samples."""
+    
+    def __init__(self):
+        self.color_analyzer = ColorAnalyzer()
+        
+        # Standard illuminant spectral power distributions (simplified)
+        self.illuminants = {
+            'D65': self._generate_d65_spd(),      # Daylight 6500K
+            'A': self._generate_illuminant_a(),   # Incandescent 2856K
+            'F2': self._generate_f2_spd(),        # Cool white fluorescent
+            'LED': self._generate_led_spd()       # Modern LED
+        }
+        
+        # RGB sensor response curves (approximate sRGB primaries)
+        self.rgb_responses = self._generate_rgb_responses()
+    
+    def _generate_d65_spd(self) -> Dict[float, float]:
+        """Generate D65 standard illuminant spectral power distribution."""
+        wavelengths = np.arange(380, 701, 5)
+        # Simplified D65 - actual would use CIE standard
+        spd = {}
+        for wl in wavelengths:
+            if wl < 400:
+                power = 0.3 + 0.7 * (wl - 380) / 20
+            elif wl < 500:
+                power = 1.0
+            elif wl < 600:
+                power = 1.1 - 0.1 * (wl - 500) / 100
+            else:
+                power = 1.0 - 0.2 * (wl - 600) / 100
+            spd[wl] = max(0.1, power)
+        return spd
+    
+    def _generate_illuminant_a(self) -> Dict[float, float]:
+        """Generate Illuminant A (incandescent) SPD."""
+        wavelengths = np.arange(380, 701, 5)
+        spd = {}
+        for wl in wavelengths:
+            # Planckian radiator at 2856K (simplified)
+            power = (wl / 560) ** -1.5  # Reddish bias
+            spd[wl] = power
+        return spd
+    
+    def _generate_f2_spd(self) -> Dict[float, float]:
+        """Generate F2 fluorescent SPD with mercury peaks."""
+        wavelengths = np.arange(380, 701, 5)
+        spd = {}
+        mercury_peaks = [405, 436, 546, 578]  # Mercury emission lines
+        
+        for wl in wavelengths:
+            # Base fluorescent continuum
+            base = 0.5 + 0.3 * np.sin((wl - 380) * np.pi / 320)
+            
+            # Add mercury peaks
+            peak_contribution = 0
+            for peak in mercury_peaks:
+                if abs(wl - peak) < 10:
+                    peak_contribution += 2.0 * np.exp(-((wl - peak) / 5) ** 2)
+            
+            spd[wl] = base + peak_contribution
+        return spd
+    
+    def _generate_led_spd(self) -> Dict[float, float]:
+        """Generate modern LED SPD (blue peak + phosphor)."""
+        wavelengths = np.arange(380, 701, 5)
+        spd = {}
+        for wl in wavelengths:
+            # Blue LED peak around 450nm
+            blue_peak = 3.0 * np.exp(-((wl - 450) / 20) ** 2)
+            
+            # Phosphor broad emission 500-700nm
+            if wl > 480:
+                phosphor = 0.8 * (1 - np.exp(-(wl - 480) / 60)) * np.exp(-(wl - 550) / 100)
+            else:
+                phosphor = 0
+            
+            spd[wl] = blue_peak + phosphor
+        return spd
+    
+    def _generate_rgb_responses(self) -> Dict[str, Dict[float, float]]:
+        """Generate RGB sensor response curves."""
+        wavelengths = np.arange(380, 701, 5)
+        responses = {'R': {}, 'G': {}, 'B': {}}
+        
+        for wl in wavelengths:
+            # Red response (peak ~600nm)
+            r_response = np.exp(-((wl - 600) / 80) ** 2) if wl > 500 else 0
+            
+            # Green response (peak ~550nm)
+            g_response = np.exp(-((wl - 550) / 60) ** 2)
+            
+            # Blue response (peak ~450nm)
+            b_response = np.exp(-((wl - 450) / 50) ** 2) if wl < 550 else 0
+            
+            responses['R'][wl] = r_response
+            responses['G'][wl] = g_response
+            responses['B'][wl] = b_response
+        
+        return responses
+    
+    def analyze_spectral_response(self, measurements: List[ColorMeasurement], 
+                                illuminant: str = 'D65') -> List[SpectralMeasurement]:
+        """
+        Analyze spectral response characteristics of color measurements.
+        
+        Args:
+            measurements: List of ColorMeasurement objects
+            illuminant: Illuminant type for analysis
+            
+        Returns:
+            List of SpectralMeasurement objects
+        """
+        if illuminant not in self.illuminants:
+            raise ValueError(f"Unknown illuminant: {illuminant}")
+        
+        spectral_data = []
+        spd = self.illuminants[illuminant]
+        
+        for i, measurement in enumerate(measurements):
+            # Convert RGB to relative spectral response
+            r, g, b = measurement.rgb
+            
+            # Estimate spectral characteristics based on RGB ratios
+            for wavelength in sorted(spd.keys()):
+                # Calculate relative response at this wavelength
+                r_resp = self.rgb_responses['R'].get(wavelength, 0) * (r / 255.0)
+                g_resp = self.rgb_responses['G'].get(wavelength, 0) * (g / 255.0)
+                b_resp = self.rgb_responses['B'].get(wavelength, 0) * (b / 255.0)
+                
+                rgb_response = (r_resp, g_resp, b_resp)
+                
+                # Normalize to illuminant power
+                illuminant_power = spd[wavelength]
+                relative_response = tuple(resp / illuminant_power for resp in rgb_response)
+                
+                spectral_measurement = SpectralMeasurement(
+                    wavelength=wavelength,
+                    rgb_response=rgb_response,
+                    relative_response=relative_response,
+                    sample_id=f"sample_{i+1}",
+                    illuminant=illuminant
+                )
+                spectral_data.append(spectral_measurement)
+        
+        return spectral_data
+    
+    def plot_spectral_response(self, spectral_data: List[SpectralMeasurement], 
+                             sample_ids: Optional[List[str]] = None) -> None:
+        """
+        Plot spectral response curves for analyzed samples.
+        
+        Args:
+            spectral_data: List of SpectralMeasurement objects
+            sample_ids: Optional list of specific sample IDs to plot
+        """
+        if not spectral_data:
+            print("No spectral data to plot")
+            return
+        
+        # Group data by sample
+        sample_data = {}
+        for measurement in spectral_data:
+            if sample_ids and measurement.sample_id not in sample_ids:
+                continue
+            
+            if measurement.sample_id not in sample_data:
+                sample_data[measurement.sample_id] = {
+                    'wavelengths': [],
+                    'r_response': [],
+                    'g_response': [],
+                    'b_response': []
+                }
+            
+            sample_data[measurement.sample_id]['wavelengths'].append(measurement.wavelength)
+            sample_data[measurement.sample_id]['r_response'].append(measurement.relative_response[0])
+            sample_data[measurement.sample_id]['g_response'].append(measurement.relative_response[1])
+            sample_data[measurement.sample_id]['b_response'].append(measurement.relative_response[2])
+        
+        # Create plots
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        fig.suptitle('Spectral Response Analysis', fontsize=16)
+        
+        # Plot 1: All RGB responses for first sample
+        if sample_data:
+            first_sample = list(sample_data.keys())[0]
+            data = sample_data[first_sample]
+            
+            axes[0, 0].plot(data['wavelengths'], data['r_response'], 'r-', label='Red', linewidth=2)
+            axes[0, 0].plot(data['wavelengths'], data['g_response'], 'g-', label='Green', linewidth=2)
+            axes[0, 0].plot(data['wavelengths'], data['b_response'], 'b-', label='Blue', linewidth=2)
+            axes[0, 0].set_xlabel('Wavelength (nm)')
+            axes[0, 0].set_ylabel('Relative Response')
+            axes[0, 0].set_title(f'RGB Response Curves - {first_sample}')
+            axes[0, 0].legend()
+            axes[0, 0].grid(True, alpha=0.3)
+        
+        # Plot 2: R/G ratio across spectrum
+        axes[0, 1].set_title('Red/Green Ratio vs Wavelength')
+        for sample_id, data in sample_data.items():
+            rg_ratio = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['r_response'])):
+                r, g = data['r_response'][i], data['g_response'][i]
+                ratio = r / (g + 0.001) if g > 0.001 else 0  # Avoid division by zero
+                rg_ratio.append(ratio)
+            axes[0, 1].plot(wavelengths, rg_ratio, label=sample_id, alpha=0.7)
+        axes[0, 1].set_xlabel('Wavelength (nm)')
+        axes[0, 1].set_ylabel('R/G Ratio')
+        axes[0, 1].legend()
+        axes[0, 1].grid(True, alpha=0.3)
+        
+        # Plot 3: B/G ratio across spectrum
+        axes[1, 0].set_title('Blue/Green Ratio vs Wavelength')
+        for sample_id, data in sample_data.items():
+            bg_ratio = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['b_response'])):
+                b, g = data['b_response'][i], data['g_response'][i]
+                ratio = b / (g + 0.001) if g > 0.001 else 0
+                bg_ratio.append(ratio)
+            axes[1, 0].plot(wavelengths, bg_ratio, label=sample_id, alpha=0.7)
+        axes[1, 0].set_xlabel('Wavelength (nm)')
+        axes[1, 0].set_ylabel('B/G Ratio')
+        axes[1, 0].legend()
+        axes[1, 0].grid(True, alpha=0.3)
+        
+        # Plot 4: Spectral deviation analysis
+        axes[1, 1].set_title('Channel Deviation Across Spectrum')
+        for sample_id, data in sample_data.items():
+            deviations = []
+            wavelengths = data['wavelengths']
+            for i in range(len(data['r_response'])):
+                r, g, b = data['r_response'][i], data['g_response'][i], data['b_response'][i]
+                mean_response = (r + g + b) / 3
+                deviation = np.std([r, g, b]) / (mean_response + 0.001)
+                deviations.append(deviation)
+            axes[1, 1].plot(wavelengths, deviations, label=sample_id, alpha=0.7)
+        axes[1, 1].set_xlabel('Wavelength (nm)')
+        axes[1, 1].set_ylabel('Coefficient of Variation')
+        axes[1, 1].legend()
+        axes[1, 1].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def calculate_metamerism_index(self, measurement1: ColorMeasurement, 
+                                 measurement2: ColorMeasurement) -> float:
+        """
+        Calculate metamerism index between two color measurements.
+        
+        Args:
+            measurement1: First color measurement
+            measurement2: Second color measurement
+            
+        Returns:
+            Metamerism index (0 = perfect match, higher = more metameric)
+        """
+        # Convert to XYZ for multiple illuminants
+        metameric_differences = []
+        
+        for illuminant in ['D65', 'A', 'F2']:
+            # This is a simplified calculation - would need full spectral data for accuracy
+            xyz1 = self._rgb_to_xyz(measurement1.rgb, illuminant)
+            xyz2 = self._rgb_to_xyz(measurement2.rgb, illuminant)
+            
+            # Calculate color difference in XYZ space
+            diff = np.sqrt(sum((a - b) ** 2 for a, b in zip(xyz1, xyz2)))
+            metameric_differences.append(diff)
+        
+        # Metamerism index is the standard deviation of differences across illuminants
+        return np.std(metameric_differences)
+    
+    def _rgb_to_xyz(self, rgb: Tuple[float, float, float], illuminant: str) -> Tuple[float, float, float]:
+        """Convert RGB to XYZ under specified illuminant (simplified)."""
+        r, g, b = [c / 255.0 for c in rgb]
+        
+        # Standard sRGB to XYZ matrix (would need chromatic adaptation for other illuminants)
+        x = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b
+        y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b
+        z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b
+        
+        # Simple illuminant scaling (very approximate)
+        if illuminant == 'A':
+            x *= 1.1  # Warmer
+            z *= 0.8
+        elif illuminant == 'F2':
+            # Fluorescent has spiky spectrum
+            x *= 0.95
+            z *= 1.05
+        
+        return (x * 100, y * 100, z * 100)
+    
+    def analyze_wavelength_deviation(self, measurements: List[ColorMeasurement]) -> Dict[str, List[float]]:
+        """
+        Analyze how RGB channels deviate from each other across the spectrum.
+        
+        This addresses your core question about channel deviation across wavelengths.
+        
+        Args:
+            measurements: List of color measurements
+            
+        Returns:
+            Dictionary with deviation metrics across wavelength ranges
+        """
+        wavelength_ranges = {
+            'violet': (380, 450),
+            'blue': (450, 495),
+            'green': (495, 570),
+            'yellow': (570, 590),
+            'orange': (590, 620),
+            'red': (620, 700)
+        }
+        
+        deviation_analysis = {
+            'wavelength_range': [],
+            'rg_deviation': [],  # Red-Green deviation
+            'rb_deviation': [],  # Red-Blue deviation
+            'gb_deviation': [],  # Green-Blue deviation
+            'total_deviation': []  # Overall channel deviation
+        }
+        
+        for range_name, (min_wl, max_wl) in wavelength_ranges.items():
+            rg_deviations = []
+            rb_deviations = []
+            gb_deviations = []
+            total_deviations = []
+            
+            for measurement in measurements:
+                r, g, b = measurement.rgb
+                
+                # Normalize to prevent brightness bias
+                total = r + g + b
+                if total > 0:
+                    r_norm, g_norm, b_norm = r/total, g/total, b/total
+                    
+                    # Calculate channel deviations
+                    rg_dev = abs(r_norm - g_norm)
+                    rb_dev = abs(r_norm - b_norm)
+                    gb_dev = abs(g_norm - b_norm)
+                    total_dev = np.std([r_norm, g_norm, b_norm])
+                    
+                    rg_deviations.append(rg_dev)
+                    rb_deviations.append(rb_dev)
+                    gb_deviations.append(gb_dev)
+                    total_deviations.append(total_dev)
+            
+            # Average deviations for this wavelength range
+            deviation_analysis['wavelength_range'].append(range_name)
+            deviation_analysis['rg_deviation'].append(np.mean(rg_deviations) if rg_deviations else 0)
+            deviation_analysis['rb_deviation'].append(np.mean(rb_deviations) if rb_deviations else 0)
+            deviation_analysis['gb_deviation'].append(np.mean(gb_deviations) if gb_deviations else 0)
+            deviation_analysis['total_deviation'].append(np.mean(total_deviations) if total_deviations else 0)
+        
+        return deviation_analysis
+    
+    def export_spectral_analysis(self, spectral_data: List[SpectralMeasurement], 
+                               filename: str) -> bool:
+        """Export spectral analysis data to CSV file."""
+        try:
+            import csv
+            
+            with open(filename, 'w', newline='') as csvfile:
+                fieldnames = ['sample_id', 'wavelength', 'r_response', 'g_response', 
+                            'b_response', 'r_relative', 'g_relative', 'b_relative', 'illuminant']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                
+                writer.writeheader()
+                for measurement in spectral_data:
+                    writer.writerow({
+                        'sample_id': measurement.sample_id,
+                        'wavelength': measurement.wavelength,
+                        'r_response': measurement.rgb_response[0],
+                        'g_response': measurement.rgb_response[1],
+                        'b_response': measurement.rgb_response[2],
+                        'r_relative': measurement.relative_response[0],
+                        'g_relative': measurement.relative_response[1],
+                        'b_relative': measurement.relative_response[2],
+                        'illuminant': measurement.illuminant
+                    })
+            
+            print(f"Spectral analysis exported to {filename}")
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting spectral analysis: {e}")
+            return False
+
+def analyze_spectral_deviation_from_measurements(measurements: List[ColorMeasurement]) -> None:
+    """
+    Quick analysis function to examine channel deviation across color samples.
+    This directly addresses your question about RGB channel behavior across the spectrum.
+    """
+    analyzer = SpectralAnalyzer()
+    
+    print("=== SPECTRAL DEVIATION ANALYSIS ===")
+    print("Analyzing how RGB channels deviate across wavelength ranges...")
+    print()
+    
+    # Analyze wavelength-based deviations
+    deviation_data = analyzer.analyze_wavelength_deviation(measurements)
+    
+    print("Channel Deviation by Wavelength Range:")
+    print("=" * 50)
+    print(f"{'Range':<10} {'R-G Dev':<10} {'R-B Dev':<10} {'G-B Dev':<10} {'Total Dev':<10}")
+    print("-" * 50)
+    
+    for i, range_name in enumerate(deviation_data['wavelength_range']):
+        rg_dev = deviation_data['rg_deviation'][i]
+        rb_dev = deviation_data['rb_deviation'][i]
+        gb_dev = deviation_data['gb_deviation'][i]
+        total_dev = deviation_data['total_deviation'][i]
+        
+        print(f"{range_name:<10} {rg_dev:<10.3f} {rb_dev:<10.3f} {gb_dev:<10.3f} {total_dev:<10.3f}")
+    
+    print("\nInterpretation:")
+    print("- Higher values indicate greater channel deviation")
+    print("- R-G Dev: Red-Green channel difference")
+    print("- R-B Dev: Red-Blue channel difference")  
+    print("- G-B Dev: Green-Blue channel difference")
+    print("- Total Dev: Overall RGB channel spread")
+    print("\nThis analysis reveals how color channels behave differently")
+    print("across the visible spectrum for your stamp samples!")
