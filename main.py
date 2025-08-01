@@ -1370,7 +1370,7 @@ class StampZApp:
         """Open spectral analysis dialog for current color measurements."""
         try:
             from utils.spectral_analyzer import SpectralAnalyzer, analyze_spectral_deviation_from_measurements
-            from utils.color_analyzer import ColorAnalyzer
+            from utils.color_analyzer import ColorAnalyzer, ColorMeasurement
             from tkinter import Toplevel, Text, Scrollbar, Button, Frame, messagebox
             
             # Check if we have color measurement data
@@ -1386,8 +1386,31 @@ class StampZApp:
             if current_sample_set and self.current_file:
                 # Get measurements from database for current sample set
                 try:
-                    analyzer = ColorAnalyzer()
-                    measurements = analyzer.get_color_measurements(current_sample_set)
+                    from utils.color_analysis_db import ColorAnalysisDB
+                    db = ColorAnalysisDB(current_sample_set)
+                    raw_measurements = db.get_all_measurements()
+                    
+                    # Convert to ColorMeasurement objects
+                    measurements = []
+                    for raw in raw_measurements:
+                        measurement = ColorMeasurement(
+                            coordinate_id=raw.get('id', 0),
+                            coordinate_point=raw.get('coordinate_point', 0),
+                            position=(raw.get('x_position', 0.0), raw.get('y_position', 0.0)),
+                            rgb=(raw.get('rgb_r', 0), raw.get('rgb_g', 0), raw.get('rgb_b', 0)),
+                            lab=(raw.get('l_value', 0.0), raw.get('a_value', 0.0), raw.get('b_value', 0.0)),
+                            sample_area={
+                                'type': raw.get('sample_type', 'circle'),
+                                'size': (raw.get('sample_width', 10.0), raw.get('sample_height', 10.0)),
+                                'anchor': raw.get('anchor', 'center')
+                            },
+                            measurement_date=raw.get('measurement_date', ''),
+                            notes=raw.get('notes', '')
+                        )
+                        measurements.append(measurement)
+                    
+                    print(f"DEBUG: Loaded {len(measurements)} measurements from ColorAnalysisDB for {current_sample_set}")
+                        
                 except Exception as e:
                     print(f"Could not load measurements from database: {e}")
             
