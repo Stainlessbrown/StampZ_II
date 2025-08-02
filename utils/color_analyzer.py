@@ -530,6 +530,44 @@ class ColorAnalyzer:
             print(f"Error saving color measurements: {e}")
             return False
     
+    def _extract_sample_identifier_from_filename(self, image_path: str) -> str:
+        """Extract a unique sample identifier from the image filename.
+        
+        Args:
+            image_path: Path to the image file
+            
+        Returns:
+            Sample identifier string that preserves original sample info
+        """
+        filename = os.path.basename(image_path)
+        base_name = os.path.splitext(filename)[0]
+        
+        # Check if filename contains sample number pattern (like F137-S48-crp)
+        import re
+        
+        # Pattern for F###-S##-xxx format
+        pattern = r'F(\d+)-S(\d+)'
+        match = re.search(pattern, base_name)
+        if match:
+            form_num = match.group(1)
+            sample_num = match.group(2)
+            sample_id = f"F{form_num}-S{sample_num}"
+            print(f"DEBUG: Extracted sample identifier '{sample_id}' from filename '{filename}'")
+            return sample_id
+        
+        # Pattern for other sample formats (e.g., containing S## somewhere)
+        pattern2 = r'S(\d+)'
+        match2 = re.search(pattern2, base_name)
+        if match2:
+            sample_num = match2.group(1)
+            sample_id = f"S{sample_num}"
+            print(f"DEBUG: Extracted sample identifier '{sample_id}' from filename '{filename}'")
+            return sample_id
+        
+        # Fallback: use the base filename as-is
+        print(f"DEBUG: Using full filename '{base_name}' as sample identifier")
+        return base_name
+    
     def analyze_image_colors_from_canvas(self, image_path: str, coordinate_set_name: str, 
                                         canvas_coordinates: List[dict], 
                                         description: str = None) -> Optional[List[ColorMeasurement]]:
@@ -552,13 +590,13 @@ class ColorAnalyzer:
             measurements = self.extract_sample_colors_from_coordinates(image, canvas_coordinates)
             print(f"Extracted {len(measurements)} color measurements using canvas coordinates")
             
-            # Create new measurement set
+            # Create new measurement set using sample identifier from filename
             import os
-            image_name = os.path.splitext(os.path.basename(image_path))[0]
+            sample_identifier = self._extract_sample_identifier_from_filename(image_path)
             
-            # Create a new measurement set
+            # Create a new measurement set with the sample identifier
             db = ColorAnalysisDB(coordinate_set_name)
-            set_id = db.create_measurement_set(image_name, description)
+            set_id = db.create_measurement_set(sample_identifier, description)
             
             if set_id is not None:
                 print(f"Created measurement set with ID {set_id}")

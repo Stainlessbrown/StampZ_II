@@ -120,10 +120,22 @@ class ColorAnalysisDB:
         """Create a new measurement set and return its ID."""
         try:
             with sqlite3.connect(self.db_path) as conn:
+                # Check if a measurement set with this image_name already exists
+                cursor = conn.execute("""
+                    SELECT set_id FROM measurement_sets WHERE image_name = ?
+                """, (image_name,))
+                existing = cursor.fetchone()
+                
+                if existing:
+                    print(f"Using existing measurement set {existing[0]} for image '{image_name}'")
+                    return existing[0]
+                
+                # Create new measurement set
                 cursor = conn.execute("""
                     INSERT INTO measurement_sets (image_name, description)
                     VALUES (?, ?)
                 """, (image_name, description))
+                print(f"Created new measurement set {cursor.lastrowid} for image '{image_name}'")
                 return cursor.lastrowid
         except sqlite3.Error as e:
             print(f"Error creating measurement set: {e}")

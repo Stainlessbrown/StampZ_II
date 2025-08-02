@@ -1607,7 +1607,7 @@ class StampZApp:
                         if plot_filepath:
                             spectral_analyzer._save_plot_path = plot_filepath
                     
-                    spectral_analyzer.plot_spectral_response(spectral_data)
+                    spectral_analyzer.plot_spectral_response(spectral_data, interactive=True)
                     
                     if save_plot and hasattr(spectral_analyzer, '_save_plot_path'):
                         del spectral_analyzer._save_plot_path  # Clean up
