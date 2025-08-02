@@ -203,6 +203,46 @@ class PreferencesDialog:
         self.filename_template_var.trace_add("write", self._update_filename_preview)
         self.include_timestamp_var.trace_add("write", self._update_filename_preview)
         
+        # Export format section
+        format_frame = ttk.LabelFrame(export_frame, text="Export Format", padding="10")
+        format_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(format_frame, text="Preferred export format:").pack(anchor=tk.W, pady=(0, 5))
+        
+        self.export_format_var = tk.StringVar()
+        format_radio_frame = ttk.Frame(format_frame)
+        format_radio_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Radiobutton(
+            format_radio_frame,
+            text="ODS (LibreOffice Calc) - Recommended",
+            variable=self.export_format_var,
+            value="ods"
+        ).pack(anchor=tk.W)
+        
+        ttk.Radiobutton(
+            format_radio_frame,
+            text="XLSX (Microsoft Excel)",
+            variable=self.export_format_var,
+            value="xlsx"
+        ).pack(anchor=tk.W)
+        
+        ttk.Radiobutton(
+            format_radio_frame,
+            text="CSV (Comma Separated Values)",
+            variable=self.export_format_var,
+            value="csv"
+        ).pack(anchor=tk.W)
+        
+        # Format info
+        format_info = ttk.Label(
+            format_frame,
+            text="Note: Files will open in the appropriate application based on format",
+            font=("TkDefaultFont", 9),
+            foreground="blue"
+        )
+        format_info.pack(anchor=tk.W, pady=(5, 0))
+        
         # Export behavior section
         behavior_frame = ttk.LabelFrame(export_frame, text="Export Behavior", padding="10")
         behavior_frame.pack(fill=tk.X, pady=(0, 10))
@@ -210,7 +250,7 @@ class PreferencesDialog:
         self.auto_open_var = tk.BooleanVar()
         ttk.Checkbutton(
             behavior_frame,
-            text="Automatically open exported files in LibreOffice",
+            text="Automatically open exported files after export",
             variable=self.auto_open_var
         ).pack(anchor=tk.W)
         
@@ -340,6 +380,9 @@ class PreferencesDialog:
         self.filename_template_var.set(prefs.export_filename_format)
         self.include_timestamp_var.set(prefs.include_timestamp)
         
+        # Export format
+        self.export_format_var.set(prefs.preferred_export_format)
+        
         # Export behavior
         self.auto_open_var.set(prefs.auto_open_after_export)
         
@@ -436,6 +479,9 @@ class PreferencesDialog:
             # Filename settings
             self.prefs_manager.preferences.export_prefs.export_filename_format = self.filename_template_var.get()
             self.prefs_manager.preferences.export_prefs.include_timestamp = self.include_timestamp_var.get()
+            
+            # Export format
+            self.prefs_manager.set_preferred_export_format(self.export_format_var.get())
             
             # Export behavior
             self.prefs_manager.preferences.export_prefs.auto_open_after_export = self.auto_open_var.get()

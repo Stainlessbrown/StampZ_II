@@ -1,0 +1,14 @@
+{
+  "export_prefs": {
+    "ods_export_directory": "",
+    "auto_open_after_export": true,
+    "export_filename_format": "{sample_set}_{date}",
+    "include_timestamp": false,
+    "preferred_export_format": "ods"
+  },
+  "file_dialog_prefs": {
+    "last_open_directory": "",
+    "last_save_directory": "",
+    "remember_directories": true
+  }
+}

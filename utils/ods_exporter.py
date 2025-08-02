@@ -7,6 +7,7 @@ Creates .ods files that can be opened in LibreOffice Calc on Mac.
 import sqlite3
 import os
 import subprocess
+import csv
 from datetime import datetime
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
@@ -427,19 +428,167 @@ class ODSExporter:
             print(f"Error exporting to ODS: {e}")
             return False
     
-    def export_to_sample_set_file(self, base_filename: str = None) -> str:
+    def export_to_xlsx(self, output_path: str) -> bool:
+        """Export color analysis data to an Excel (.xlsx) file using pandas.
+        For accumulation mode, includes ALL measurements from database (no deduplication).
+        """
+        try:
+            # Check if pandas is available
+            try:
+                import pandas as pd
+            except ImportError:
+                print("Error: pandas library not available. Install with: pip install pandas")
+                return False
+            
+            # Get ALL measurements from database (no deduplication for accumulation)
+            measurements = self.get_color_measurements(deduplicate=False)
+            
+            if not measurements:
+                print("No color measurements found in database")
+                return False
+            
+            # Sort measurements by date for chronological order in spreadsheet
+            measurements.sort(key=lambda x: x.measurement_date)
+            
+            # Convert measurements to DataFrame
+            data = []
+            for measurement in measurements:
+                data.append({
+                    'L*': measurement.l_value,
+                    'a*': measurement.a_value,
+                    'b*': measurement.b_value,
+                    'DataID': measurement.data_id,
+                    'X': measurement.x_position,
+                    'Y': measurement.y_position,
+                    'Shape': measurement.sample_shape,
+                    'Size': measurement.sample_size,
+                    'Anchor': measurement.sample_anchor,
+                    'R': measurement.rgb_r,
+                    'G': measurement.rgb_g,
+                    'B': measurement.rgb_b,
+                    'DataID_2': measurement.data_id,  # Duplicate column for compatibility
+                    'Date': measurement.measurement_date,
+                    'Notes': measurement.notes or '',
+                    'Calculations': '',  # Empty column for user calculations
+                    'Averages': '',      # Empty column for user averages
+                    'Analysis': ''       # Empty column for user analysis
+                })
+            
+            df = pd.DataFrame(data)
+            
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Save to Excel with proper formatting
+            with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Color Analysis Data', index=False)
+                
+                # Get the workbook and worksheet to apply formatting
+                workbook = writer.book
+                worksheet = writer.sheets['Color Analysis Data']
+                
+                # Auto-adjust column widths
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)  # Cap at 50 characters
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            print(f"Successfully exported {len(measurements)} measurements to: {output_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting to XLSX: {e}")
+            return False
+    
+    def export_to_csv(self, output_path: str) -> bool:
+        """Export color analysis data to a CSV file.
+        For accumulation mode, includes ALL measurements from database (no deduplication).
+        """
+        try:
+            # Get ALL measurements from database (no deduplication for accumulation)
+            measurements = self.get_color_measurements(deduplicate=False)
+            
+            if not measurements:
+                print("No color measurements found in database")
+                return False
+            
+            # Sort measurements by date for chronological order in spreadsheet
+            measurements.sort(key=lambda x: x.measurement_date)
+            
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Define headers
+            headers = ['L*', 'a*', 'b*', 'DataID', 'X', 'Y', 'Shape', 'Size', 'Anchor', 
+                      'R', 'G', 'B', 'DataID_2', 'Date', 'Notes', 'Calculations', 'Averages', 'Analysis']
+            
+            # Write CSV file
+            with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                # Write header row
+                writer.writerow(headers)
+                
+                # Write data rows
+                for measurement in measurements:
+                    row = [
+                        f"{measurement.l_value:.2f}",
+                        f"{measurement.a_value:.2f}",
+                        f"{measurement.b_value:.2f}",
+                        measurement.data_id,
+                        f"{measurement.x_position:.1f}",
+                        f"{measurement.y_position:.1f}",
+                        measurement.sample_shape,
+                        measurement.sample_size,
+                        measurement.sample_anchor,
+                        f"{measurement.rgb_r:.2f}",
+                        f"{measurement.rgb_g:.2f}",
+                        f"{measurement.rgb_b:.2f}",
+                        measurement.data_id,  # Duplicate DataID column
+                        measurement.measurement_date,
+                        measurement.notes or '',
+                        '',  # Calculations column
+                        '',  # Averages column
+                        ''   # Analysis column
+                    ]
+                    writer.writerow(row)
+            
+            print(f"Successfully exported {len(measurements)} measurements to: {output_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error exporting to CSV: {e}")
+            return False
+    
+    def export_to_sample_set_file(self, base_filename: str = None, format_type: str = "ods") -> str:
         """Export to a single file per sample set using user preferences.
         
         Args:
             base_filename: Optional base filename. If None, uses sample set name or default
+            format_type: Export format ('ods', 'xlsx', or 'csv')
         """
         try:
+            # Validate format type
+            if format_type not in ['ods', 'xlsx', 'csv']:
+                print(f"Error: Unsupported format type '{format_type}'. Use 'ods', 'xlsx', or 'csv'.")
+                return None
+            
+            # Determine file extension
+            extension = f".{format_type}"
+            
             # Use preferences for export directory and filename
             if self.prefs_manager:
                 export_dir = self.prefs_manager.get_export_directory()
                 filename = self.prefs_manager.get_export_filename(
                     sample_set_name=self.sample_set_name or base_filename,
-                    extension=".ods"
+                    extension=extension
                 )
                 output_path = os.path.join(export_dir, filename)
                 print(f"DEBUG ODSExporter: Using preferences - directory: {export_dir}, filename: {filename}")
@@ -455,7 +604,7 @@ class ODSExporter:
                         # Use a default name for the current export
                         base_filename = "stampz_color_data"
                 
-                filename = f"{base_filename}.ods"
+                filename = f"{base_filename}{extension}"
                 
                 # Save to exports directory using consistent path resolution
                 stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
@@ -466,7 +615,16 @@ class ODSExporter:
                     current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     output_path = os.path.join(current_dir, "exports", filename)
             
-            if self.export_to_ods(output_path):
+            # Export using the appropriate method
+            success = False
+            if format_type == "ods":
+                success = self.export_to_ods(output_path)
+            elif format_type == "xlsx":
+                success = self.export_to_xlsx(output_path)
+            elif format_type == "csv":
+                success = self.export_to_csv(output_path)
+            
+            if success:
                 self.last_saved_file = output_path  # Store for potential opening
                 return output_path
             return None
@@ -474,6 +632,22 @@ class ODSExporter:
         except Exception as e:
             print(f"DEBUG ODSExporter: Error in export_to_sample_set_file: {e}")
             return None
+    
+    def export_to_excel_file(self, base_filename: str = None) -> str:
+        """Convenience method to export to Excel format.
+        
+        Args:
+            base_filename: Optional base filename. If None, uses sample set name or default
+        """
+        return self.export_to_sample_set_file(base_filename, "xlsx")
+    
+    def export_to_csv_file(self, base_filename: str = None) -> str:
+        """Convenience method to export to CSV format.
+        
+        Args:
+            base_filename: Optional base filename. If None, uses sample set name or default
+        """
+        return self.export_to_sample_set_file(base_filename, "csv")
     
     def export_with_timestamp(self, base_filename: str = None) -> str:
         """Export with a timestamped filename (legacy method for compatibility).
@@ -596,12 +770,16 @@ class ODSExporter:
         return os.path.join(exports_dir, latest_file)
     
     def view_latest_spreadsheet(self) -> bool:
-        """Create a new export with proper naming and open it."""
-        # Always create a fresh export to ensure we have the latest data
-        output_file = self.export_to_sample_set_file()
-    
+        """Create a new export with the preferred format and open it."""
+        from .user_preferences import get_preferences_manager
+
+        prefs_manager = get_preferences_manager()
+        preferred_format = prefs_manager.get_preferred_export_format()
+        
+        output_file = self.export_to_sample_set_file(format_type=preferred_format)
+        
         if output_file:
-           return self.open_file_with_default_app(output_file)
+            return self.open_file_with_default_app(output_file)
         return False
 
 def main():

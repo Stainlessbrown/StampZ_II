@@ -8,5 +8,8 @@ colorspacious==1.1.2
 matplotlib==3.9.2
 pandas==2.2.3
 
+# Excel export support
+openpyxl==3.1.2
+
 # Build dependencies
 pyinstaller==6.3.0

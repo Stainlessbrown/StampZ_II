@@ -18,6 +18,15 @@ try:
 except Exception:
     pass
 
+# Collect openpyxl data files and imports
+try:
+    openpyxl_datas, openpyxl_binaries, openpyxl_hiddenimports = collect_all('openpyxl')
+    datas += openpyxl_datas
+    binaries += openpyxl_binaries
+    hiddenimports += openpyxl_hiddenimports
+except Exception:
+    pass
+
 # Add additional hidden imports
 hiddenimports += [
     'PIL.Image',
@@ -47,6 +56,7 @@ hiddenimports += [
     'odf.text',
     'odf.style',
     'odf.number',
+    'openpyxl',
 ]
 
 # Platform specific settings

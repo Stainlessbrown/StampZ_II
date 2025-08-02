@@ -18,6 +18,7 @@ class ExportPreferences:
     auto_open_after_export: bool = True
     export_filename_format: str = "{sample_set}_{date}"  # Template for filename
     include_timestamp: bool = False  # Whether to include timestamp in filename
+    preferred_export_format: str = "ods"  # Preferred export format: 'ods', 'xlsx', or 'csv'
 
 
 @dataclass
@@ -169,6 +170,28 @@ class PreferencesManager:
             print(f"Error setting remember directories preference: {e}")
             return False
     
+    def get_preferred_export_format(self) -> str:
+        """Get the preferred export format."""
+        return self.preferences.export_prefs.preferred_export_format
+    
+    def set_preferred_export_format(self, format_type: str) -> bool:
+        """Set the preferred export format.
+        
+        Args:
+            format_type: Export format ('ods', 'xlsx', or 'csv')
+        """
+        if format_type not in ['ods', 'xlsx', 'csv']:
+            print(f"Error: Invalid export format '{format_type}'. Use 'ods', 'xlsx', or 'csv'.")
+            return False
+        
+        try:
+            self.preferences.export_prefs.preferred_export_format = format_type
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting preferred export format: {e}")
+            return False
+    
     def get_export_filename(self, sample_set_name: str = None, extension: str = ".ods") -> str:
         """Generate export filename based on preferences."""
         from datetime import datetime
@@ -212,7 +235,8 @@ class PreferencesManager:
                         ods_export_directory=export_data.get('ods_export_directory', ''),
                         auto_open_after_export=export_data.get('auto_open_after_export', True),
                         export_filename_format=export_data.get('export_filename_format', '{sample_set}_{date}'),
-                        include_timestamp=export_data.get('include_timestamp', False)
+                        include_timestamp=export_data.get('include_timestamp', False),
+                        preferred_export_format=export_data.get('preferred_export_format', 'ods')
                     )
                 
                 # Load file dialog preferences
