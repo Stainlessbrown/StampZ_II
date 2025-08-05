@@ -11,6 +11,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from PIL import Image
+import os
+import re
 
 class PrintType(Enum):
     """Type of printing method used for the stamp."""
@@ -543,7 +545,6 @@ class ColorAnalyzer:
         base_name = os.path.splitext(filename)[0]
         
         # Check if filename contains sample number pattern (like F137-S48-crp)
-        import re
         
         # Pattern for F###-S##-xxx format
         pattern = r'F(\d+)-S(\d+)'
@@ -591,7 +592,6 @@ class ColorAnalyzer:
             print(f"Extracted {len(measurements)} color measurements using canvas coordinates")
             
             # Create new measurement set using sample identifier from filename
-            import os
             sample_identifier = self._extract_sample_identifier_from_filename(image_path)
             
             # Create a new measurement set with the sample identifier
@@ -651,7 +651,6 @@ class ColorAnalyzer:
             print(f"Extracted {len(measurements)} color measurements")
             
             # Save to database with image name
-            import os
             image_name = os.path.splitext(os.path.basename(image_path))[0]
             if self.save_color_measurements(measurements, coordinate_set_name, image_name):
                 print("Color measurements saved to database")
