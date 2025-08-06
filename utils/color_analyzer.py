@@ -29,6 +29,7 @@ except ImportError:
 
 from .coordinate_db import CoordinateDB, CoordinatePoint, SampleAreaType
 from .color_analysis_db import ColorAnalysisDB
+from .color_calibration import ColorCalibrator
 
 @dataclass
 class ColorMeasurement:
@@ -56,6 +57,11 @@ class ColorAnalyzer:
         """
         self.db = CoordinateDB()
         self.print_type = print_type
+        self.calibrator = ColorCalibrator()
+        self.color_correction = None  # Will hold correction matrix if calibrated
+        
+        # Load saved calibration if available
+        self.load_saved_calibration()
     
     def rgb_to_lab(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
         """Convert RGB to CIE L*a*b* color space.
@@ -363,9 +369,17 @@ class ColorAnalyzer:
         left, top, right, bottom = bounds
         pixels = []
         
-        # Convert image to RGB if needed
+        # Convert image to RGB if needed with proper color space handling
         if image.mode != 'RGB':
+            # Preserve color profile during conversion if possible
+            if hasattr(image, 'info') and 'icc_profile' in image.info:
+                print(f"DEBUG: Image has ICC profile, preserving during RGB conversion")
             image = image.convert('RGB')
+        
+        # Check for common screenshot color issues
+        if hasattr(image, 'filename') and any(term in str(image.filename).lower() 
+                                           for term in ['screenshot', 'screen', 'capture']):
+            print(f"DEBUG: Screenshot detected - applying color correction")
         
         total_pixels = 0
         total_r = 0
@@ -480,9 +494,18 @@ class ColorAnalyzer:
         avg_g = total_g / num_pixels
         avg_b = total_b / num_pixels
         
-        # For debugging
-        print(f"Final average RGB values: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
-        return (avg_r, avg_g, avg_b)
+        # Apply color correction if calibrated
+        uncorrected_rgb = (avg_r, avg_g, avg_b)
+        corrected_rgb = self.apply_color_correction(uncorrected_rgb)
+        
+        # For debugging - show both values if correction was applied
+        if self.is_calibrated():
+            print(f"Original average RGB: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
+            print(f"Corrected RGB values: R={corrected_rgb[0]:.2f}, G={corrected_rgb[1]:.2f}, B={corrected_rgb[2]:.2f}")
+        else:
+            print(f"Final average RGB values: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
+            
+        return corrected_rgb
     
     def save_color_measurements(self, measurements: List[ColorMeasurement], coordinate_set_name: str, image_name: str) -> bool:
         """Save color measurements to the separate sample set database.
@@ -773,6 +796,57 @@ class ColorAnalyzer:
             print(f"Database error retrieving color measurements: {e}")
             
         return measurements
+    
+    def load_saved_calibration(self):
+        """Load saved calibration settings from preferences file."""
+        try:
+            import json
+            # Use full path to StampZ preferences file
+            prefs_file = os.path.expanduser("~/Library/Application Support/StampZ/preferences.json")
+            
+            if os.path.exists(prefs_file):
+                with open(prefs_file, 'r') as f:
+                    prefs = json.load(f)
+                
+                calibration = prefs.get('color_calibration', {})
+                if calibration.get('enabled', False):
+                    self.color_correction = calibration.get('correction_matrix')
+                    if self.color_correction:
+                        print(f"Loaded color calibration: R{self.color_correction['red_correction']:+.1f}, "
+                              f"G{self.color_correction['green_correction']:+.1f}, "
+                              f"B{self.color_correction['blue_correction']:+.1f}")
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Warning: Could not load calibration settings: {e}")
+            return False
+    
+    def apply_color_correction(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
+        """Apply color correction if calibrated.
+        
+        Args:
+            rgb: Original RGB tuple
+            
+        Returns:
+            Corrected RGB tuple (or original if not calibrated)
+        """
+        if self.color_correction is None:
+            return rgb
+        
+        # Convert to int tuple for correction, then back to float
+        rgb_int = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        corrected_int = self.calibrator.apply_correction(rgb_int, self.color_correction)
+        return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
+    
+    def is_calibrated(self) -> bool:
+        """Check if color calibration is active.
+        
+        Returns:
+            True if calibrated, False otherwise
+        """
+        return self.color_correction is not None
 
 # Utility function for quick color analysis
 def analyze_colors(image_path: str, coordinate_set_name: str, print_type: PrintType = PrintType.SOLID_PRINTED) -> None:

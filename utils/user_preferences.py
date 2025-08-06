@@ -258,19 +258,29 @@ class PreferencesManager:
         return False
     
     def save_preferences(self) -> bool:
-        """Save preferences to file."""
+        """Save preferences to file, preserving any existing data."""
         try:
             # Ensure the preferences directory exists
             self.prefs_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Convert to dictionary for JSON serialization
-            data = {
+            # Load existing preferences to preserve other sections (like color calibration)
+            existing_data = {}
+            if self.prefs_file.exists():
+                try:
+                    with open(self.prefs_file, 'r') as f:
+                        existing_data = json.load(f)
+                except json.JSONDecodeError:
+                    # If file is corrupted, start fresh but preserve structure
+                    existing_data = {}
+            
+            # Update only the preferences we manage, preserving everything else
+            existing_data.update({
                 'export_prefs': asdict(self.preferences.export_prefs),
                 'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs)
-            }
+            })
             
             with open(self.prefs_file, 'w') as f:
-                json.dump(data, f, indent=2)
+                json.dump(existing_data, f, indent=2)
                 
             print(f"Saved preferences to {self.prefs_file}")
             return True
