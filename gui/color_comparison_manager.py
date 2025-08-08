@@ -479,7 +479,10 @@ class ColorComparisonManager(tk.Frame):
                     if added_color:
                         print(f"DEBUG: Retrieved color: {added_color.name}, {added_color.lab}")
                     
-                    messagebox.showinfo("Success", f"Color '{name}' added to library '{library}'")
+                    # Refresh the library display if the main library window is open
+                    self._refresh_library_manager(library)
+                    
+                    messagebox.showinfo("Success", f"Color '{name}' added to library '{library}'\n\nNote: If the Library window is open, you may need to\nclose and reopen it to see the new color.")
                     dialog.destroy()
                 else:
                     messagebox.showerror("Error", f"Failed to add color '{name}' to library '{library}'")
@@ -498,6 +501,52 @@ class ColorComparisonManager(tk.Frame):
         
         # Focus the name entry
         name_entry.focus_set()
+    
+    def _refresh_library_manager(self, library_name: str):
+        """Refresh the library manager display if it's open.
+        
+        Args:
+            library_name: Name of the library that was updated
+        """
+        try:
+            # Try to find the main app through the widget hierarchy
+            widget = self
+            main_app = None
+            
+            # Navigate up the widget hierarchy to find main app
+            while widget:
+                if hasattr(widget, 'main_app'):
+                    main_app = widget.main_app
+                    break
+                elif hasattr(widget, 'master'):
+                    widget = widget.master
+                    if hasattr(widget, 'main_app'):
+                        main_app = widget.main_app
+                        break
+                else:
+                    break
+            
+            # If we found the main app, check if it has an active library manager
+            if main_app and hasattr(main_app, '_active_library_manager'):
+                lib_manager = main_app._active_library_manager
+                if lib_manager and hasattr(lib_manager, 'current_library_name'):
+                    # Check if the updated library matches the currently displayed one
+                    if lib_manager.current_library_name == library_name:
+                        print(f"DEBUG: Refreshing library manager display for {library_name}")
+                        
+                        # Refresh the display
+                        if hasattr(lib_manager, '_update_colors_display'):
+                            lib_manager._update_colors_display()
+                        
+                        # Also update stats
+                        if hasattr(lib_manager, '_update_stats'):
+                            lib_manager._update_stats()
+                        
+                        print(f"DEBUG: Successfully refreshed library display")
+            
+        except Exception as e:
+            print(f"DEBUG: Error refreshing library manager: {str(e)}")
+            # Don't show error to user as this is just a convenience feature
     
     def _on_sample_toggle(self):
         """Handle sample toggle event."""
