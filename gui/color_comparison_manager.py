@@ -449,6 +449,9 @@ class ColorComparisonManager(tk.Frame):
             name = name_var.get().strip()
             library = lib_var.get()
             
+            print(f"DEBUG: Compare Add Color - name='{name}', library='{library}'")
+            print(f"DEBUG: Compare Add Color - rgb_values={rgb_values}, lab_values={lab_values}")
+            
             if not name:
                 messagebox.showerror("Error", "Please enter a color name")
                 return
@@ -458,15 +461,33 @@ class ColorComparisonManager(tk.Frame):
                 
             try:
                 # Load the selected library
+                print(f"DEBUG: Creating ColorLibrary instance with name: {library}")
                 color_lib = ColorLibrary(library)
                 
-                # Add the new color with keyword arguments
-                color_lib.add_color(name=name, rgb=rgb_values, lab=lab_values)
+                print(f"DEBUG: ColorLibrary created with db_path: {color_lib.db_path}")
                 
-                messagebox.showinfo("Success", f"Color '{name}' added to library '{library}'")
-                dialog.destroy()
+                # Add the new color with keyword arguments
+                print(f"DEBUG: Calling add_color with name={name}, rgb={rgb_values}, lab={lab_values}")
+                success = color_lib.add_color(name=name, rgb=rgb_values, lab=lab_values)
+                
+                print(f"DEBUG: add_color returned: {success}")
+                
+                if success:
+                    # Verify the color was actually added
+                    added_color = color_lib.get_color_by_name(name)
+                    print(f"DEBUG: Verification - color retrieved: {added_color is not None}")
+                    if added_color:
+                        print(f"DEBUG: Retrieved color: {added_color.name}, {added_color.lab}")
+                    
+                    messagebox.showinfo("Success", f"Color '{name}' added to library '{library}'")
+                    dialog.destroy()
+                else:
+                    messagebox.showerror("Error", f"Failed to add color '{name}' to library '{library}'")
                 
             except Exception as e:
+                print(f"DEBUG: Exception in save_color: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 messagebox.showerror("Error", f"Failed to add color: {str(e)}")
         
         # Buttons frame
