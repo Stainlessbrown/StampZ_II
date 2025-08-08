@@ -30,18 +30,53 @@ class PreferencesDialog:
     def _setup_dialog(self):
         """Set up the dialog window."""
         self.root.title("StampZ Preferences")
-        self.root.geometry("650x550")  # Increased height to ensure buttons are visible
-        self.root.resizable(True, True)  # Allow resizing both ways
         
-        # Make dialog modal
+        # Get screen dimensions to calculate optimal dialog size
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate dialog size based on screen size, leaving space for dock/taskbar
+        if screen_height <= 768:  # Small screens (laptops)
+            dialog_height = min(650, int(screen_height * 0.85))  # Much taller for small screens
+        else:  # Larger screens
+            dialog_height = min(800, int(screen_height * 0.90))  # Much taller for large screens
+        
+        dialog_width = min(750, int(screen_width * 0.65))  # Slightly wider
+        
+        # Make dialog modal and set proper parent relationship first
         self.root.transient(self.parent)
-        self.root.grab_set()
         
-        # Center the dialog
-        self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (self.root.winfo_width() // 2)
-        y = (self.root.winfo_screenheight() // 2) - (self.root.winfo_height() // 2)
-        self.root.geometry(f"+{x}+{y}")
+        # Wait for parent window to be fully initialized
+        self.parent.update_idletasks()
+        
+        # Position relative to parent window, but with fallback to screen center
+        try:
+            parent_x = self.parent.winfo_x()
+            parent_y = self.parent.winfo_y()
+            parent_width = self.parent.winfo_width()
+            parent_height = self.parent.winfo_height()
+            
+            # Calculate position relative to parent window
+            x = parent_x + (parent_width - dialog_width) // 2
+            y = parent_y + (parent_height - dialog_height) // 2
+        except tk.TclError:
+            # Fallback to screen center if parent info not available
+            x = (screen_width - dialog_width) // 2
+            y = (screen_height - dialog_height) // 2
+        
+        # Ensure dialog stays on screen
+        x = max(50, min(x, screen_width - dialog_width - 50))
+        y = max(50, min(y, screen_height - dialog_height - 50))
+        
+        # Set size and position in one call to prevent flashing
+        self.root.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.root.resizable(True, True)
+        
+        # Set minimum size to ensure all content is usable
+        self.root.minsize(650, 600)  # Increased minimum height significantly
+        
+        # Set modal behavior after positioning
+        self.root.grab_set()
         
         # Handle window closing
         self.root.protocol("WM_DELETE_WINDOW", self._on_cancel)
@@ -70,46 +105,42 @@ class PreferencesDialog:
         # self._create_general_tab(notebook)
         # self._create_appearance_tab(notebook)
         
-        # Button frame - fixed at bottom, never gets pushed off-screen
-        button_frame = ttk.Frame(main_frame, relief='solid', borderwidth=1)  # Added border for debugging
+        # Button frame - fixed at bottom with proper spacing
+        button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(10, 0))
         
-        # Make sure button frame doesn't expand
-        button_frame.pack_propagate(False)
-        button_frame.configure(height=50)  # Fixed height
-        
-        # Buttons with explicit styling to make them more visible
+        # Create buttons with proper spacing and visibility
         reset_btn = ttk.Button(
             button_frame, 
             text="Reset to Defaults", 
             command=self._reset_to_defaults
         )
-        reset_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        reset_btn.pack(side=tk.LEFT, padx=5, pady=10)
+        
+        # Create a frame for right-aligned buttons
+        right_buttons = ttk.Frame(button_frame)
+        right_buttons.pack(side=tk.RIGHT, padx=5, pady=10)
         
         cancel_btn = ttk.Button(
-            button_frame, 
+            right_buttons, 
             text="Cancel", 
             command=self._on_cancel
         )
-        cancel_btn.pack(side=tk.RIGHT, padx=5, pady=5)
+        cancel_btn.pack(side=tk.RIGHT, padx=(5, 0))
         
         apply_btn = ttk.Button(
-            button_frame, 
+            right_buttons, 
             text="Apply", 
             command=self._on_apply
         )
-        apply_btn.pack(side=tk.RIGHT, padx=5, pady=5)
+        apply_btn.pack(side=tk.RIGHT, padx=5)
         
         ok_btn = ttk.Button(
-            button_frame, 
+            right_buttons, 
             text="OK", 
             command=self._on_ok
         )
-        ok_btn.pack(side=tk.RIGHT, padx=5, pady=5)
-        
-        # Debug label to confirm buttons are created
-        debug_label = ttk.Label(button_frame, text="Buttons should be here:", foreground="red")
-        debug_label.pack(side=tk.LEFT, padx=(20, 5))
+        ok_btn.pack(side=tk.RIGHT, padx=5)
     
     def _create_export_tab(self, notebook):
         """Create the export preferences tab."""
@@ -252,25 +283,6 @@ class PreferencesDialog:
             behavior_frame,
             text="Automatically open exported files after export",
             variable=self.auto_open_var
-        ).pack(anchor=tk.W)
-        
-        # Info section
-        info_frame = ttk.LabelFrame(export_frame, text="Information", padding="10")
-        info_frame.pack(fill=tk.X)
-        
-        info_text = (
-            "• Export files are saved as .ods (LibreOffice Calc) format\n"
-            "• Files can be opened with LibreOffice Calc, Excel, or other spreadsheet apps\n"
-            "• Default location is Desktop/StampZ Exports (easier to find than hidden folders)\n"
-            "• Template variables: {sample_set} = template name, {date} = YYYYMMDD, {datetime} = YYYYMMDD_HHMMSS"
-        )
-        
-        ttk.Label(
-            info_frame,
-            text=info_text,
-            wraplength=550,
-            justify=tk.LEFT,
-            font=("TkDefaultFont", 9)
         ).pack(anchor=tk.W)
     
     def _create_file_dialog_tab(self, notebook):

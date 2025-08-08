@@ -112,167 +112,116 @@ class ReorganizedControlPanel(ttk.Frame):
     def _create_always_visible_section(self):
         """Create the always-visible controls section."""
         
-        # SECTION 1: Core Action Buttons (3 per row)
-        core_frame = ttk.LabelFrame(self, text="Core Actions")
-        core_frame.pack(fill=tk.X, padx=5, pady=2)
+        # SECTION 1: Core Action Buttons (ultra-compressed layout)
+        core_frame = ttk.Frame(self)  # Remove LabelFrame to save space
+        core_frame.pack(fill=tk.X, padx=2, pady=1)
         
-        # Row 1: Open New, Open Recent, Save
+        # Add section label with better readability
+        ttk.Label(core_frame, text="Actions", font=('Arial', 12, 'bold')).pack(anchor='w')
+        
+        # Row 1: Open, Save, Reset
         row1 = ttk.Frame(core_frame)
-        row1.pack(fill=tk.X, padx=5, pady=2)
+        row1.pack(fill=tk.X, pady=1)
         
-        ttk.Button(row1, text="Open New", command=self.on_open).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        ttk.Button(row1, text="Open Recent", command=self.open_recent).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+        ttk.Button(row1, text="Open", command=self.on_open).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=(0,1))
         ttk.Button(row1, text="Save", command=self.on_save).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+            side=tk.LEFT, expand=True, fill=tk.X, padx=1)
+        ttk.Button(row1, text="Reset", command=self.on_reset).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=(1,0))
         
-        # Row 2: Reset, Clear
+        # Row 2: Clear, Fit, Exit
         row2 = ttk.Frame(core_frame)
-        row2.pack(fill=tk.X, padx=5, pady=2)
+        row2.pack(fill=tk.X, pady=1)
         
-        ttk.Button(row2, text="Reset", command=self.on_reset).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         ttk.Button(row2, text="Clear", command=self.on_clear).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-
-        # Row 3: Fit Window, DB Examine
-        row3 = ttk.Frame(core_frame)
-        row3.pack(fill=tk.X, padx=5, pady=2)
-        
-        ttk.Button(row3, text="Fit Window", command=self.on_fit_to_window).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        ttk.Button(row3, text="DB Examine", command=lambda: self.main_app.open_database_viewer() if hasattr(self.main_app, 'open_database_viewer') else None).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=2)
-        
-        # Row 4: Exit button (full width)
-        row4 = ttk.Frame(core_frame)
-        row4.pack(fill=tk.X, padx=5, pady=2)
+            side=tk.LEFT, expand=True, fill=tk.X, padx=(0,1))
+        ttk.Button(row2, text="Fit", command=self.on_fit_to_window).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=1)
         
         style = ttk.Style()
         style.configure('Exit.TButton', foreground='red')
-        ttk.Button(row4, text="Exit", command=self.on_quit, style='Exit.TButton').pack(
-            fill=tk.X, padx=2)
+        ttk.Button(row2, text="Exit", command=self.on_quit, style='Exit.TButton').pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=(1,0))
         
-        # SECTION 2: Current File Info
-        file_frame = ttk.LabelFrame(self, text="Current File")
-        file_frame.pack(fill=tk.X, padx=5, pady=2)
+        # Row 3: Open Recent, DB Examine (additional functions)
+        row3 = ttk.Frame(core_frame)
+        row3.pack(fill=tk.X, pady=1)
         
-        ttk.Label(file_frame, textvariable=self.current_filename, 
-                 foreground="gray", font=('Arial', 11, 'bold')).pack(pady=5)
+        ttk.Button(row3, text="Open Recent", command=self.open_recent).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=(0,1))
+        ttk.Button(row3, text="DB Examine", command=self._open_database_viewer).pack(
+            side=tk.LEFT, expand=True, fill=tk.X, padx=1)
+        # Empty third button to maintain layout balance
+        ttk.Label(row3, text="").pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(1,0))
         
-        # SECTION 3: Mouse Coordinates with Ruler/Grid Controls
-        coord_frame = ttk.LabelFrame(self, text="Mouse Coordinates")
-        coord_frame.pack(fill=tk.X, padx=5, pady=2)
+        # SECTION 2: File Info (ultra-compact - no frame)
+        file_row = ttk.Frame(self)
+        file_row.pack(fill=tk.X, padx=2, pady=1)
         
-        coord_row = ttk.Frame(coord_frame)
-        coord_row.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(file_row, text="File:", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
+        ttk.Label(file_row, textvariable=self.current_filename, 
+                 foreground="gray", font=('Arial', 12, 'italic')).pack(side=tk.LEFT, padx=(3, 0))
         
-        # Left side: Coordinate display
-        coord_display = ttk.Frame(coord_row)
-        coord_display.pack(side=tk.LEFT)
+        # SECTION 3: Coordinates and Zoom (super compressed)
+        coord_row = ttk.Frame(self)
+        coord_row.pack(fill=tk.X, padx=2, pady=1)
         
-        ttk.Label(coord_display, text="X:", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(coord_display, textvariable=self.mouse_x, 
+        # Left: Coordinates
+        ttk.Label(coord_row, text="X:", font=('Arial', 12)).pack(side=tk.LEFT)
+        ttk.Label(coord_row, textvariable=self.mouse_x, 
                  font=('Arial', 12, 'bold'), foreground='#0066CC').pack(
-                     side=tk.LEFT, padx=(5, 10))
+                     side=tk.LEFT, padx=(2, 5))
         
-        ttk.Label(coord_display, text="Y:", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(coord_display, textvariable=self.mouse_y, 
+        ttk.Label(coord_row, text="Y:", font=('Arial', 12)).pack(side=tk.LEFT)
+        ttk.Label(coord_row, textvariable=self.mouse_y, 
                  font=('Arial', 12, 'bold'), foreground='#0066CC').pack(
-                     side=tk.LEFT, padx=(5, 5))
+                     side=tk.LEFT, padx=(2, 5))
         
-        ttk.Label(coord_display, text="pixels", font=('Arial', 12)).pack(side=tk.LEFT)
+        # Right: Zoom controls (compact with slider)
+        zoom_frame = ttk.Frame(coord_row)
+        zoom_frame.pack(side=tk.RIGHT, padx=2)
         
-        # Right side: Ruler/Grid toggles
-        toggle_frame = ttk.Frame(coord_row)
-        toggle_frame.pack(side=tk.RIGHT)
-        
-        ttk.Checkbutton(toggle_frame, text="Show Rulers", variable=self.show_rulers,
-                      command=self._on_ruler_toggle).pack(side=tk.LEFT, padx=5)
-        ttk.Checkbutton(toggle_frame, text="Show Grid", variable=self.show_grid,
-                      command=self._on_grid_toggle).pack(side=tk.LEFT, padx=5)
-        
-        # SECTION 3.5: Zoom Control
-        zoom_frame = ttk.LabelFrame(self, text="Zoom Control")
-        zoom_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        zoom_row = ttk.Frame(zoom_frame)
-        zoom_row.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Zoom level variable (0.1 to 10.0)
         self.zoom_level = tk.DoubleVar(value=1.0)
         
-        ttk.Label(zoom_row, text="Zoom:").pack(side=tk.LEFT)
+        # Zoom buttons and display in top row
+        zoom_top = ttk.Frame(zoom_frame)
+        zoom_top.pack(fill=tk.X)
         
-        # Zoom out button
-        ttk.Button(zoom_row, text="-", width=3, command=self._zoom_out).pack(side=tk.LEFT, padx=(5, 2))
+        ttk.Button(zoom_top, text="-", width=2, command=self._zoom_out).pack(side=tk.LEFT, padx=(0,1))
+        self.zoom_display = ttk.Label(zoom_top, text="100%", font=('Arial', 9, 'bold'), 
+                                     foreground='#0066CC', width=5)
+        self.zoom_display.pack(side=tk.LEFT, padx=1)
+        ttk.Button(zoom_top, text="+", width=2, command=self._zoom_in).pack(side=tk.LEFT, padx=(1,0))
         
-        # Zoom slider (0-10 scale)
-        self.zoom_scale = ttk.Scale(zoom_row, from_=0.1, to=10.0, 
-                                   variable=self.zoom_level, orient=tk.HORIZONTAL,
-                                   command=self._on_zoom_change, length=120)
-        self.zoom_scale.pack(side=tk.LEFT, padx=2)
+        # Compact zoom slider in bottom row  
+        self.zoom_slider = ttk.Scale(zoom_frame, from_=0.1, to=5.0, orient=tk.HORIZONTAL,
+                                    variable=self.zoom_level, length=80,
+                                    command=self._on_zoom_change)
+        self.zoom_slider.pack(fill=tk.X, pady=(1,0))
         
-        # Zoom in button
-        ttk.Button(zoom_row, text="+", width=3, command=self._zoom_in).pack(side=tk.LEFT, padx=(2, 5))
+        # SECTION 4: Tool Mode (ultra-compact)
+        mode_row = ttk.Frame(self)
+        mode_row.pack(fill=tk.X, padx=2, pady=1)
         
-        # Zoom level display
-        self.zoom_display = ttk.Label(zoom_row, text="100%", font=('Arial', 10))
-        self.zoom_display.pack(side=tk.LEFT, padx=(5, 0))
+        ttk.Label(mode_row, text="Mode:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 2))
         
-        # Reset zoom button
-        ttk.Button(zoom_row, text="Reset", command=self._reset_zoom).pack(side=tk.RIGHT)
-        
-        # SECTION 4: Tool Mode Selection
-        mode_frame = ttk.LabelFrame(self, text="Tool Mode")
-        mode_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        mode_options = ttk.Frame(mode_frame)
-        mode_options.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Single row for all tool modes
-        mode_row = ttk.Frame(mode_options)
-        mode_row.pack(fill=tk.X)
-        
-        # Create a frame for tool mode buttons with equal spacing
-        mode_row = ttk.Frame(mode_options)
-        mode_row.pack(fill=tk.X, expand=True)
-        
-        # Create a frame for tool mode buttons with even spacing
+        # Compact tool mode buttons - smaller padding
         style = ttk.Style()
-        style.configure('Tool.TRadiobutton', padding=5)
+        style.configure('Compact.TRadiobutton', padding=2)
         
-        # Create the buttons with equal width and proper spacing
-        ttk.Radiobutton(mode_row, text="View/Pan", value="view",
+        ttk.Radiobutton(mode_row, text="View", value="view",
                        variable=self.tool_mode, command=self._on_tool_mode_change,
-                       style='Tool.TRadiobutton').pack(side=tk.LEFT, expand=True, padx=2)
+                       style='Compact.TRadiobutton').pack(side=tk.LEFT, padx=1)
         ttk.Radiobutton(mode_row, text="Level", value="straighten",
                        variable=self.tool_mode, command=self._on_tool_mode_change,
-                       style='Tool.TRadiobutton').pack(side=tk.LEFT, expand=True, padx=2)
-        # Note: value remains 'straighten' for backward compatibility
+                       style='Compact.TRadiobutton').pack(side=tk.LEFT, padx=1)
         ttk.Radiobutton(mode_row, text="Crop", value="crop",
                        variable=self.tool_mode, command=self._on_tool_mode_change,
-                       style='Tool.TRadiobutton').pack(side=tk.LEFT, expand=True, padx=2)
+                       style='Compact.TRadiobutton').pack(side=tk.LEFT, padx=1)
         ttk.Radiobutton(mode_row, text="Sample", value="coord",
                        variable=self.tool_mode, command=self._on_tool_mode_change,
-                       style='Tool.TRadiobutton').pack(side=tk.LEFT, expand=True, padx=2)
-        
-        # SECTION 5: Line Color and Ruler/Grid (always visible, no frame title)
-        display_frame = ttk.Frame(self)
-        display_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Line color controls
-        color_frame = ttk.Frame(display_frame)
-        color_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        colors = ["blue", "red", "green", "black", "white"]
-        for color in colors:
-            ttk.Radiobutton(color_frame, text=color.capitalize(), value=color,
-                           variable=self.line_color, command=self._on_line_color_change).pack(
-                               side=tk.LEFT, padx=2)
-        
-        # Removed redundant ruler/grid controls
+                       style='Compact.TRadiobutton').pack(side=tk.LEFT, padx=1)
 
     def _create_context_sensitive_sections(self):
         """Create tool-specific control sections (hidden by default)."""
@@ -621,14 +570,7 @@ class ReorganizedControlPanel(ttk.Frame):
         )
         add_to_lib_btn.pack(padx=1)
         
-        # Add helpful text to explain the workflow
-        help_text = ttk.Label(
-            analysis_frame,
-            text="Sample → Analyze → Add to Library → Compare with known colors",
-            font=("Arial", 9, "italic"),
-            foreground="#666666"
-        )
-        help_text.pack(pady=(2, 5))
+        # Removed verbose help text to save space
         
         # Removed redundant library selection from main controls
         
@@ -1532,6 +1474,19 @@ class ReorganizedControlPanel(ttk.Frame):
         else:
             print("DEBUG: main_app not found for add to library")
             messagebox.showinfo("Info", "Add to library - connect to main app implementation")
+    
+    def _open_database_viewer(self):
+        """Open database viewer for examining color analysis data."""
+        if hasattr(self, 'main_app') and self.main_app:
+            if hasattr(self.main_app, 'open_database_viewer'):
+                print("DEBUG: Calling main_app.open_database_viewer()")
+                self.main_app.open_database_viewer()
+            else:
+                print("DEBUG: main_app.open_database_viewer method NOT found")
+                messagebox.showinfo("Info", "Database viewer method not found in main app")
+        else:
+            print("DEBUG: main_app not found for database viewer")
+            messagebox.showinfo("Info", "Database viewer - connect to main app implementation")
     
     # Zoom control methods
     def _on_zoom_change(self, value):

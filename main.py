@@ -45,14 +45,32 @@ class StampZApp:
             self.recent_files = RecentFilesManager(recent_dir=recent_dir)
         else:
             self.recent_files = RecentFilesManager()
+        # Get screen dimensions
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        window_width = int(screen_width * 0.9)
-        window_height = int(screen_height * 0.9)
+        
+        # Account for dock/taskbar - be very conservative for smaller monitors
+        # Base sizing on 13" MacBooks (1440x900) and smaller screens first
+        if screen_height <= 768:  # 13" laptops and smaller (1366x768)
+            window_height = int(screen_height * 0.55)  # Very aggressive - max 422px on 768px screen
+        elif screen_height <= 900:  # 13" MacBooks (1440x900)
+            window_height = int(screen_height * 0.58)  # Aggressive - max 522px on 900px screen
+        elif screen_height <= 1080:  # 21.5" iMacs and similar (1920x1080)
+            window_height = int(screen_height * 0.62)  # Conservative - max 670px on 1080px screen
+        else:  # Larger monitors
+            window_height = int(screen_height * 0.68)  # More room for large displays
+        
+        # For width, we can be more generous since horizontal space is less constrained
+        window_width = int(screen_width * 0.85)
+        
+        # Position window with some top margin to account for menu bars
         x_position = (screen_width - window_width) // 2
-        y_position = (screen_height - window_height) // 2
+        y_position = max(50, (screen_height - window_height) // 2)  # At least 50px from top
+        
         self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
-        self.root.minsize(800, 600)
+        
+        # Set minimum size to ensure all UI elements can be visible, but smaller for small monitors
+        self.root.minsize(900, 780)  # Reduced to fit on 1366x768 and smaller screens
         self.root.protocol("WM_DELETE_WINDOW", self.quit_app)
         self.root.resizable(True, True)
         self.main_container = ttk.Frame(self.root)
