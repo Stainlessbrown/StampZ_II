@@ -43,9 +43,6 @@ class PreferencesDialog:
         
         dialog_width = min(750, int(screen_width * 0.65))  # Slightly wider
         
-        # Make dialog modal and set proper parent relationship first
-        self.root.transient(self.parent)
-        
         # Wait for parent window to be fully initialized
         self.parent.update_idletasks()
         
@@ -75,8 +72,24 @@ class PreferencesDialog:
         # Set minimum size to ensure all content is usable
         self.root.minsize(650, 600)  # Increased minimum height significantly
         
-        # Set modal behavior after positioning
+        # Make dialog modal without transient relationship to avoid multi-monitor issues
+        # The transient() call causes the dialog to disappear when moved between screens on macOS
+        # We'll use grab_set() for modality without the problematic parent-child relationship
+        
+        # Skip transient() entirely to prevent multi-monitor disappearing issue
+        # This means the dialog won't automatically minimize when parent minimizes,
+        # but it will stay visible when moved between screens
+        
+        # Set modal behavior - this blocks interaction with parent window
         self.root.grab_set()
+        
+        # Make the dialog appear on top and focus on it
+        self.root.lift()
+        self.root.focus_force()
+        
+        # Brief topmost to ensure visibility, then allow normal behavior
+        self.root.attributes('-topmost', True)
+        self.root.after(100, lambda: self.root.attributes('-topmost', False))
         
         # Handle window closing
         self.root.protocol("WM_DELETE_WINDOW", self._on_cancel)
@@ -342,6 +355,28 @@ class PreferencesDialog:
             command=self._clear_remembered_directories
         ).pack(side=tk.LEFT)
         
+        # Color Library section
+        library_frame = ttk.LabelFrame(dialog_frame, text="Color Library Defaults", padding="10")
+        library_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(library_frame, text="Default color library:").pack(anchor=tk.W, pady=(0, 5))
+        
+        self.default_library_var = tk.StringVar()
+        self.library_combo = ttk.Combobox(
+            library_frame,
+            textvariable=self.default_library_var,
+            state="readonly",
+            width=30
+        )
+        self.library_combo.pack(anchor=tk.W, pady=(0, 10))
+        
+        ttk.Label(
+            library_frame,
+            text="This library will be automatically selected when opening the Color Library Manager\nand when using the Compare feature in color analysis.",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W)
+        
         # Info section
         info_frame = ttk.LabelFrame(dialog_frame, text="Information", padding="10")
         info_frame.pack(fill=tk.X)
@@ -380,6 +415,56 @@ class PreferencesDialog:
             
             messagebox.showinfo("Cleared", "Remembered directories have been cleared.")
     
+    def _load_color_library_preferences(self):
+        """Load color library preferences."""
+        try:
+            # Get available libraries
+            available_libraries = self.prefs_manager.get_available_color_libraries()
+            
+            # Convert to display names for better UX
+            display_names = []
+            library_mapping = {}  # display_name -> library_name
+            
+            for lib_name in available_libraries:
+                if lib_name == 'basic_colors':
+                    display_name = 'Basic Colors'
+                elif lib_name.lower() == 'sg' or lib_name.lower() == 'stanley_gibbons_colors':
+                    display_name = 'SG (Stanley Gibbons)'
+                    lib_name = 'sg'  # Normalize
+                elif '_' in lib_name:
+                    display_name = ' '.join(word.capitalize() for word in lib_name.split('_'))
+                else:
+                    display_name = lib_name.capitalize()
+                
+                display_names.append(display_name)
+                library_mapping[display_name] = lib_name
+            
+            # Update combobox
+            self.library_combo['values'] = display_names
+            
+            # Set current selection
+            current_library = self.prefs_manager.get_default_color_library()
+            display_name = None
+            for display, lib in library_mapping.items():
+                if lib == current_library:
+                    display_name = display
+                    break
+            
+            if display_name:
+                self.default_library_var.set(display_name)
+            elif display_names:  # Fallback to first available
+                self.default_library_var.set(display_names[0])
+                
+            # Store mapping for later use
+            self._library_mapping = library_mapping
+            
+        except Exception as e:
+            print(f"Error loading color library preferences: {e}")
+            # Fallback
+            self.library_combo['values'] = ['Basic Colors']
+            self.default_library_var.set('Basic Colors')
+            self._library_mapping = {'Basic Colors': 'basic_colors'}
+    
     def _load_current_settings(self):
         """Load current settings into the dialog."""
         prefs = self.prefs_manager.preferences.export_prefs
@@ -408,6 +493,9 @@ class PreferencesDialog:
         
         last_save = self.prefs_manager.get_last_save_directory()
         self.last_save_var.set(last_save or "(none)")
+        
+        # Color library preferences
+        self._load_color_library_preferences()
         
         # Update preview
         self._update_filename_preview()
@@ -500,6 +588,13 @@ class PreferencesDialog:
             
             # File dialog preferences
             self.prefs_manager.set_remember_directories(self.remember_directories_var.get())
+            
+            # Color library preference
+            if hasattr(self, '_library_mapping') and hasattr(self, 'default_library_var'):
+                display_name = self.default_library_var.get()
+                if display_name in self._library_mapping:
+                    library_name = self._library_mapping[display_name]
+                    self.prefs_manager.set_default_color_library(library_name)
             
             # Save preferences
             success = self.prefs_manager.save_preferences()

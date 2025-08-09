@@ -26,7 +26,15 @@ class ColorLibraryManager:
     def __init__(self, parent=None):
         self.parent = parent
         self.library = None
-        self.current_library_name = "basic_colors"
+        
+        # Get default library from preferences
+        try:
+            from utils.user_preferences import get_preferences_manager
+            prefs_manager = get_preferences_manager()
+            self.current_library_name = prefs_manager.get_default_color_library()
+        except Exception as e:
+            print(f"Error loading default library preference: {e}")
+            self.current_library_name = "basic_colors"
         
         # Create main window
         if parent is None:

@@ -7,7 +7,7 @@ Manages user-configurable settings like export locations.
 import json
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 
 
@@ -27,6 +27,12 @@ class FileDialogPreferences:
     last_open_directory: str = ""  # Last directory used for opening files
     last_save_directory: str = ""  # Last directory used for saving files
     remember_directories: bool = True  # Whether to remember last used directories
+
+
+@dataclass
+class ColorLibraryPreferences:
+    """Preferences for color library system."""
+    default_library: str = "basic_colors"  # Default color library to use
     
     
 @dataclass 
@@ -34,10 +40,12 @@ class UserPreferences:
     """Main user preferences container."""
     export_prefs: ExportPreferences
     file_dialog_prefs: FileDialogPreferences
+    color_library_prefs: ColorLibraryPreferences
     
     def __init__(self):
         self.export_prefs = ExportPreferences()
         self.file_dialog_prefs = FileDialogPreferences()
+        self.color_library_prefs = ColorLibraryPreferences()
 
 
 class PreferencesManager:
@@ -192,6 +200,48 @@ class PreferencesManager:
             print(f"Error setting preferred export format: {e}")
             return False
     
+    def get_default_color_library(self) -> str:
+        """Get the default color library."""
+        return self.preferences.color_library_prefs.default_library
+    
+    def set_default_color_library(self, library_name: str) -> bool:
+        """Set the default color library.
+        
+        Args:
+            library_name: Name of the color library to set as default
+        """
+        try:
+            self.preferences.color_library_prefs.default_library = library_name
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting default color library: {e}")
+            return False
+    
+    def get_available_color_libraries(self) -> List[str]:
+        """Get a list of available color libraries."""
+        try:
+            from .path_utils import get_color_libraries_dir
+            library_dir = get_color_libraries_dir()
+            
+            # Ensure library directory exists
+            os.makedirs(library_dir, exist_ok=True)
+            
+            # Get all library files
+            library_files = [f for f in os.listdir(library_dir) if f.endswith("_library.db")]
+            
+            # Always include basic_colors if not found
+            if "basic_colors_library.db" not in library_files:
+                library_files.append("basic_colors_library.db")
+            
+            # Convert to library names (remove "_library.db" suffix)
+            library_names = [f[:-11] for f in library_files]
+            
+            return sorted(library_names)
+        except Exception as e:
+            print(f"Error getting available color libraries: {e}")
+            return ["basic_colors"]
+    
     def get_export_filename(self, sample_set_name: str = None, extension: str = ".ods") -> str:
         """Generate export filename based on preferences."""
         from datetime import datetime
@@ -248,6 +298,13 @@ class PreferencesManager:
                         remember_directories=dialog_data.get('remember_directories', True)
                     )
                 
+                # Load color library preferences
+                if 'color_library_prefs' in data:
+                    library_data = data['color_library_prefs']
+                    self.preferences.color_library_prefs = ColorLibraryPreferences(
+                        default_library=library_data.get('default_library', 'basic_colors')
+                    )
+                
                 print(f"Loaded preferences from {self.prefs_file}")
                 return True
         except Exception as e:
@@ -276,7 +333,8 @@ class PreferencesManager:
             # Update only the preferences we manage, preserving everything else
             existing_data.update({
                 'export_prefs': asdict(self.preferences.export_prefs),
-                'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs)
+                'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs),
+                'color_library_prefs': asdict(self.preferences.color_library_prefs)
             })
             
             with open(self.prefs_file, 'w') as f:

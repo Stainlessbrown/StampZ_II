@@ -587,6 +587,34 @@ class ColorComparisonManager(tk.Frame):
             self.library_combo['values'] = ['All Libraries'] + library_list
             print(f"DEBUG: Set combo values to: {self.library_combo['values']}")
             
+            # Set default library from preferences
+            try:
+                from utils.user_preferences import get_preferences_manager
+                prefs_manager = get_preferences_manager()
+                default_library = prefs_manager.get_default_color_library()
+                
+                # Check if default library exists in our list
+                if default_library in library_list:
+                    self.library_var.set(default_library)
+                    # Automatically load the default library
+                    self._on_library_selected()
+                    print(f"DEBUG: Set default library to: {default_library}")
+                elif library_list:  # Fallback to first library if default not found
+                    self.library_var.set(library_list[0])
+                    self._on_library_selected()
+                    print(f"DEBUG: Default library not found, using: {library_list[0]}")
+                else:
+                    self.library_var.set("Select Library")
+                    print("DEBUG: No libraries available")
+            except Exception as e:
+                print(f"DEBUG: Error setting default library: {e}")
+                # Fallback behavior
+                if library_list:
+                    self.library_var.set(library_list[0])
+                    self._on_library_selected()
+                else:
+                    self.library_var.set("Select Library")
+            
         except Exception as e:
             print(f"Error loading libraries: {str(e)}")
             import traceback
