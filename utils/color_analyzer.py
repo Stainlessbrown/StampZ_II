@@ -415,19 +415,8 @@ class ColorAnalyzer:
                             
                         r, g, b = pixel[:3]
                         
-                        # Skip stamp-specific filtering when in calibration mode
-                        if not self.calibration_mode:
-                            if self.print_type == PrintType.LINE_ENGRAVED:
-                                # For line-engraved stamps, include all pixels but adjust pure white
-                                if r == 255 and g == 255 and b == 255:
-                                    r, g, b = 245, 241, 235  # Slightly aged paper
-                                # Otherwise keep original values, including dark areas
-                            else:  # PrintType.SOLID_PRINTED
-                                # For solid-printed stamps, only adjust extremely light areas
-                                if r > 250 and g > 250 and b > 250:
-                                    continue  # Skip only the very whitest pixels
-                                # Keep all other colors as is
                         # In calibration mode, accept ALL pixels including pure white
+                        # Otherwise, sample all pixels as-is for accurate color measurement
                             
                         # Record actual pixel values without modifying them
                         pixels.append((r, g, b))
@@ -467,15 +456,15 @@ class ColorAnalyzer:
         
         if not pixels:
             print(f"Warning: No valid pixels found in sample area ({left}, {top}, {right}, {bottom})")
-            # Use a slightly cream color as fallback to represent typical historical paper
-            return [(235, 230, 220)]  # Cream/off-white color typical of aged paper
+            # Use neutral gray as fallback if no pixels found
+            return [(128, 128, 128)]  # Neutral gray fallback
         
-        # Calculate true averages including paper color influence
-        avg_r = total_r / total_pixels if total_pixels > 0 else 235
-        avg_g = total_g / total_pixels if total_pixels > 0 else 230
-        avg_b = total_b / total_pixels if total_pixels > 0 else 220
+        # Calculate true averages from all sampled pixels
+        avg_r = total_r / total_pixels if total_pixels > 0 else 128
+        avg_g = total_g / total_pixels if total_pixels > 0 else 128
+        avg_b = total_b / total_pixels if total_pixels > 0 else 128
         
-        print(f"Sample area ({left}, {top}, {right}, {bottom}): {total_pixels} valid non-white pixels")
+        print(f"Sample area ({left}, {top}, {right}, {bottom}): {total_pixels} pixels sampled")
         print(f"Area average RGB: ({avg_r:.1f}, {avg_g:.1f}, {avg_b:.1f})")
         
         # Return the average color as a single pixel value
