@@ -953,6 +953,7 @@ Example corrections:
             # Sample from center of each color patch
             samples = {}
             
+            # TOP ROW
             # Red patch (top-left)
             red_x = patch_width // 2
             red_y = patch_height // 2
@@ -968,11 +969,30 @@ Example corrections:
             blue_y = patch_height // 2
             samples['blue'] = img.getpixel((blue_x, blue_y))
             
+            # BOTTOM ROW  
+            # White patch (bottom-left)
+            white_x = patch_width // 2
+            white_y = patch_height + patch_height // 2
+            samples['white'] = img.getpixel((white_x, white_y))
+            
+            # Gray patch (bottom-center) - using 'gray_50' to match reference_colors key
+            gray_x = patch_width + patch_width // 2
+            gray_y = patch_height + patch_height // 2
+            samples['gray_50'] = img.getpixel((gray_x, gray_y))
+            
+            # Black patch (bottom-right)
+            black_x = 2 * patch_width + patch_width // 2
+            black_y = patch_height + patch_height // 2
+            samples['black'] = img.getpixel((black_x, black_y))
+            
             # Print debug info
             print(f"Sampled colors from {image_path}:")
             print(f"  Red: {samples['red']}")
             print(f"  Green: {samples['green']}")
             print(f"  Blue: {samples['blue']}")
+            print(f"  White: {samples['white']}")
+            print(f"  Gray: {samples['gray_50']}")
+            print(f"  Black: {samples['black']}")
             
             return samples
             
