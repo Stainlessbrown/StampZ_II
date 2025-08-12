@@ -957,9 +957,8 @@ Example corrections:
                     self.sample_size = (size, size)
                     self.anchor_position = 'center'
             
-            # Create a temporary ColorAnalyzer instance (but disable correction for calibration)
-            temp_analyzer = self.analyzer.__class__()
-            temp_analyzer.color_correction = None  # Disable correction during calibration sampling
+            # Create a temporary ColorAnalyzer instance WITHOUT loading any existing calibration
+            temp_analyzer = self.analyzer.__class__(load_calibration=False)
             
             for color_name, (x, y) in color_positions.items():
                 coord = TempCoord(x, y, sample_size)
@@ -967,10 +966,23 @@ Example corrections:
                 # Use the same sampling method as main analyzer
                 rgb_values = temp_analyzer._sample_area_color(img, coord)
                 if rgb_values:
-                    # Use same averaging method but WITHOUT color correction
-                    temp_analyzer.color_correction = None  # Ensure no correction
-                    avg_rgb = temp_analyzer._calculate_average_color(rgb_values)
-                    samples[color_name] = (int(avg_rgb[0]), int(avg_rgb[1]), int(avg_rgb[2]))
+                    # Calculate average WITHOUT any color correction by bypassing the correction method
+                    if rgb_values:
+                        # Calculate true average with full decimal precision (same as _calculate_average_color but without correction)
+                        total_r = sum(float(p[0]) for p in rgb_values)
+                        total_g = sum(float(p[1]) for p in rgb_values)
+                        total_b = sum(float(p[2]) for p in rgb_values)
+                        num_pixels = float(len(rgb_values))
+                        
+                        avg_r = total_r / num_pixels
+                        avg_g = total_g / num_pixels
+                        avg_b = total_b / num_pixels
+                        
+                        # NO color correction applied - return raw averaged values
+                        samples[color_name] = (int(avg_r), int(avg_g), int(avg_b))
+                    else:
+                        # Fallback
+                        samples[color_name] = (128, 128, 128)
                 else:
                     # Fallback to single pixel if area sampling fails
                     pil_x = x

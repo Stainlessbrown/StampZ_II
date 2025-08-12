@@ -46,7 +46,7 @@ class ColorMeasurement:
 class ColorAnalyzer:
     """Analyze colors from coordinate sample areas."""
     
-    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED):
+    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED, load_calibration: bool = True):
         """Initialize color analyzer.
         
         Args:
@@ -54,14 +54,17 @@ class ColorAnalyzer:
                        Affects how color sampling is performed.
                        LINE_ENGRAVED for line-engraved/intaglio stamps
                        SOLID_PRINTED for lithograph, photogravure, etc.
+            load_calibration: Whether to load saved calibration settings.
+                            Set to False for calibration sampling to avoid circular correction.
         """
         self.db = CoordinateDB()
         self.print_type = print_type
         self.calibrator = ColorCalibrator()
         self.color_correction = None  # Will hold correction matrix if calibrated
         
-        # Load saved calibration if available
-        self.load_saved_calibration()
+        # Load saved calibration if available and requested
+        if load_calibration:
+            self.load_saved_calibration()
     
     def rgb_to_lab(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
         """Convert RGB to CIE L*a*b* color space.
