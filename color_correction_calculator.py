@@ -6,6 +6,50 @@ Based on your system's known color shifts determined through calibration testing
 Usage: python3 color_correction_calculator.py
 """
 
+def apply_per_color_corrections(r, g, b, corrections):
+    """
+    Apply per-color specific corrections based on the enhanced calibration matrix.
+    
+    Args:
+        r, g, b: Original RGB values
+        corrections: Enhanced corrections dictionary with per_color_corrections
+        
+    Returns:
+        Corrected RGB tuple
+    """
+    # Determine dominant color
+    max_val = max(r, g, b)
+    
+    # Apply specific corrections based on dominant color
+    if g == max_val and g > r + 30 and g > b + 30:
+        # Green dominant - apply green-specific corrections
+        green_corrections = corrections['per_color_corrections']['green_dominant']
+        corrected_r = max(0, min(255, r + green_corrections.get('red_correction', 0)))
+        corrected_g = max(0, min(255, g + green_corrections.get('green_correction', 0)))
+        corrected_b = max(0, min(255, b + green_corrections.get('blue_correction', 0)))
+        
+    elif b == max_val and b > r + 30 and b > g + 30:
+        # Blue dominant - apply blue-specific corrections
+        blue_corrections = corrections['per_color_corrections']['blue_dominant']
+        corrected_r = max(0, min(255, r + blue_corrections.get('red_correction', 0)))
+        corrected_g = max(0, min(255, g + blue_corrections.get('green_correction', 0)))
+        corrected_b = max(0, min(255, b + blue_corrections.get('blue_correction', 0)))
+        
+    elif r == max_val and r > g + 30 and r > b + 30:
+        # Red dominant - apply red-specific corrections
+        red_corrections = corrections['per_color_corrections']['red_dominant']
+        corrected_r = max(0, min(255, r + red_corrections.get('red_correction', 0)))
+        corrected_g = max(0, min(255, g + red_corrections.get('green_correction', 0)))
+        corrected_b = max(0, min(255, b + red_corrections.get('blue_correction', 0)))
+        
+    else:
+        # Mixed color - apply universal corrections from the enhanced matrix
+        corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
+        corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
+        corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
+    
+    return (int(round(corrected_r)), int(round(corrected_g)), int(round(corrected_b)))
+
 def correct_color(r, g, b, method='universal', calibration_file=None):
     """
     Apply manual corrections based on your system's known shifts.
@@ -30,26 +74,38 @@ def correct_color(r, g, b, method='universal', calibration_file=None):
             import json
             import os
             
-            # Default calibration file location
-            if not calibration_file:
-                calibration_file = 'stampz_calibration.json'
+            # Try enhanced calibration first, then fallback to standard
+            calibration_files = [
+                calibration_file if calibration_file else None,
+                'stampz_calibration_enhanced.json',
+                'stampz_calibration.json'
+            ]
             
-            if os.path.exists(calibration_file):
-                with open(calibration_file, 'r') as f:
-                    calibration_data = json.load(f)
-                
-                if 'calibration_matrix' in calibration_data:
-                    corrections = calibration_data['calibration_matrix']['corrections']
+            for cal_file in calibration_files:
+                if cal_file and os.path.exists(cal_file):
+                    with open(cal_file, 'r') as f:
+                        calibration_data = json.load(f)
                     
-                    # Apply dynamic corrections
-                    corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
-                    corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
-                    corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
-                    
-                    corrected = (int(round(corrected_r)), int(round(corrected_g)), int(round(corrected_b)))
-                    method_used = 'Dynamic (from calibration file)'
-                    
-                    return corrected, method_used
+                    if 'calibration_matrix' in calibration_data:
+                        matrix = calibration_data['calibration_matrix']
+                        corrections = matrix['corrections']
+                        
+                        # Check if this is the enhanced per-color correction matrix
+                        if 'per_color_corrections' in corrections:
+                            # Apply per-color specific corrections
+                            corrected = apply_per_color_corrections(r, g, b, corrections)
+                            method_used = f'Enhanced per-color (from {os.path.basename(cal_file)})'
+                            return corrected, method_used
+                        else:
+                            # Apply standard dynamic corrections
+                            corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
+                            corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
+                            corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
+                            
+                            corrected = (int(round(corrected_r)), int(round(corrected_g)), int(round(corrected_b)))
+                            method_used = f'Dynamic (from {os.path.basename(cal_file)})'
+                            return corrected, method_used
+                    break
         except Exception as e:
             print(f"Warning: Could not load dynamic calibration: {e}")
             # Fall back to universal method

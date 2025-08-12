@@ -823,8 +823,42 @@ class ColorAnalyzer:
             print(f"Warning: Could not load calibration settings: {e}")
             return False
     
+    def _load_enhanced_calibration(self):
+        """Try to load enhanced calibration files."""
+        try:
+            import json
+            
+            # Check for enhanced calibration files
+            calibration_files = [
+                'stampz_calibration_enhanced.json',
+                'stampz_calibration.json'
+            ]
+            
+            for cal_file in calibration_files:
+                if os.path.exists(cal_file):
+                    with open(cal_file, 'r') as f:
+                        cal_data = json.load(f)
+                    
+                    if 'calibration_matrix' in cal_data:
+                        self.color_correction = cal_data['calibration_matrix']
+                        corrections = self.color_correction.get('corrections', {})
+                        
+                        # Check if this is enhanced per-color calibration
+                        if 'per_color_corrections' in corrections:
+                            print(f"Loaded enhanced per-color calibration from {cal_file}")
+                        else:
+                            print(f"Loaded standard calibration from {cal_file}")
+                            
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"Warning: Could not load enhanced calibration: {e}")
+            return False
+    
     def apply_color_correction(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
-        """Apply color correction if calibrated.
+        """Apply color correction using the enhanced calibration system.
         
         Args:
             rgb: Original RGB tuple
@@ -833,12 +867,33 @@ class ColorAnalyzer:
             Corrected RGB tuple (or original if not calibrated)
         """
         if self.color_correction is None:
-            return rgb
+            # Try to load enhanced calibration
+            if not self._load_enhanced_calibration():
+                return rgb
         
-        # Convert to int tuple for correction, then back to float
+        # Convert to int tuple for correction
         rgb_int = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
-        corrected_int = self.calibrator.apply_correction(rgb_int, self.color_correction)
-        return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
+        
+        # Use the enhanced color correction calculator for consistent results
+        try:
+            from color_correction_calculator import correct_color
+            corrected_int, method_used = correct_color(*rgb_int, method='dynamic')
+            
+            # Log the correction method used (for first few corrections only)
+            if not hasattr(self, '_correction_method_logged'):
+                print(f"Using color correction method: {method_used}")
+                self._correction_method_logged = True
+                
+            return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
+            
+        except Exception as e:
+            print(f"Warning: Enhanced calibration failed, using fallback: {e}")
+            # Fallback to original calibration method
+            if self.color_correction:
+                corrected_int = self.calibrator.apply_correction(rgb_int, self.color_correction)
+                return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
+            else:
+                return rgb
     
     def is_calibrated(self) -> bool:
         """Check if color calibration is active.
