@@ -916,15 +916,13 @@ Example corrections:
             print(f"Warning: Could not save standalone calibration file: {e}")
     
     def _sample_colors_from_calibration_image(self, image_path):
-        """Sample RGB colors from the calibration target image."""
+        """Sample RGB colors from the calibration target image using the same method as main analyzer."""
         try:
-            # Use the StampZ image loader which handles color profiles properly
-            from utils.image_processor import load_image
-            
-            # Load the image with proper color profile conversion
-            img = load_image(image_path)
+            # Load image using PIL directly (like main analyzer)
+            img = Image.open(image_path)
             
             width, height = img.size
+            print(f"Calibration image loaded: {width}x{height}")
             
             # Define sampling areas for a 3x2 grid (the calibration target layout)
             # Top row: Red, Green, Blue
@@ -933,43 +931,54 @@ Example corrections:
             patch_width = width // 3
             patch_height = height // 2
             
-            # Sample from center of each color patch
+            # Use realistic sampling areas (not single pixels) to match main analyzer behavior
+            sample_size = 20  # Same as typical sample area size in main analyzer
+            
             samples = {}
             
-            # TOP ROW
-            # Red patch (top-left)
-            red_x = patch_width // 2
-            red_y = patch_height // 2
-            samples['red'] = img.getpixel((red_x, red_y))
+            # Create temporary coordinate points for each color patch center
+            color_positions = {
+                'red': (patch_width // 2, height - patch_height // 2),  # Convert to Cartesian coords
+                'green': (patch_width + patch_width // 2, height - patch_height // 2),
+                'blue': (2 * patch_width + patch_width // 2, height - patch_height // 2),
+                'white': (patch_width // 2, height - (patch_height + patch_height // 2)),
+                'gray_50': (patch_width + patch_width // 2, height - (patch_height + patch_height // 2)),
+                'black': (2 * patch_width + patch_width // 2, height - (patch_height + patch_height // 2))
+            }
             
-            # Green patch (top-center)
-            green_x = patch_width + patch_width // 2
-            green_y = patch_height // 2
-            samples['green'] = img.getpixel((green_x, green_y))
+            # Use the same sampling method as the main ColorAnalyzer
+            from utils.coordinate_db import SampleAreaType
             
-            # Blue patch (top-right)
-            blue_x = 2 * patch_width + patch_width // 2
-            blue_y = patch_height // 2
-            samples['blue'] = img.getpixel((blue_x, blue_y))
+            class TempCoord:
+                def __init__(self, x, y, size):
+                    self.x = x
+                    self.y = y
+                    self.sample_type = SampleAreaType.RECTANGLE
+                    self.sample_size = (size, size)
+                    self.anchor_position = 'center'
             
-            # BOTTOM ROW  
-            # White patch (bottom-left)
-            white_x = patch_width // 2
-            white_y = patch_height + patch_height // 2
-            samples['white'] = img.getpixel((white_x, white_y))
+            # Create a temporary ColorAnalyzer instance (but disable correction for calibration)
+            temp_analyzer = self.analyzer.__class__()
+            temp_analyzer.color_correction = None  # Disable correction during calibration sampling
             
-            # Gray patch (bottom-center) - using 'gray_50' to match reference_colors key
-            gray_x = patch_width + patch_width // 2
-            gray_y = patch_height + patch_height // 2
-            samples['gray_50'] = img.getpixel((gray_x, gray_y))
-            
-            # Black patch (bottom-right)
-            black_x = 2 * patch_width + patch_width // 2
-            black_y = patch_height + patch_height // 2
-            samples['black'] = img.getpixel((black_x, black_y))
+            for color_name, (x, y) in color_positions.items():
+                coord = TempCoord(x, y, sample_size)
+                
+                # Use the same sampling method as main analyzer
+                rgb_values = temp_analyzer._sample_area_color(img, coord)
+                if rgb_values:
+                    # Use same averaging method but WITHOUT color correction
+                    temp_analyzer.color_correction = None  # Ensure no correction
+                    avg_rgb = temp_analyzer._calculate_average_color(rgb_values)
+                    samples[color_name] = (int(avg_rgb[0]), int(avg_rgb[1]), int(avg_rgb[2]))
+                else:
+                    # Fallback to single pixel if area sampling fails
+                    pil_x = x
+                    pil_y = height - y  # Convert from Cartesian to PIL coordinates
+                    samples[color_name] = img.getpixel((pil_x, pil_y))
             
             # Print debug info
-            print(f"Sampled colors from {image_path}:")
+            print(f"Sampled colors from {image_path} using REALISTIC sampling areas:")
             print(f"  Red: {samples['red']}")
             print(f"  Green: {samples['green']}")
             print(f"  Blue: {samples['blue']}")
