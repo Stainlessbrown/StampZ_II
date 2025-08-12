@@ -21,13 +21,13 @@ class ImageSaveError(Exception):
 
 def load_image(file_path: Union[str, Path]) -> Image.Image:
     """
-    Load an image file (JPG or PNG) and return a PIL Image object.
+    Load an image file (JPG or PNG) and return a PIL Image object with proper color profile handling.
     
     Args:
         file_path: Path to the image file to load
         
     Returns:
-        PIL Image object
+        PIL Image object converted to sRGB color space
         
     Raises:
         ImageLoadError: If the file cannot be loaded or is not a valid image
@@ -42,6 +42,38 @@ def load_image(file_path: Union[str, Path]) -> Image.Image:
             
         image = Image.open(file_path)
         image.load()  # Load image data immediately
+        
+        # Handle color profile conversion to ensure consistent sRGB color space
+        if hasattr(image, 'info') and 'icc_profile' in image.info:
+            logger.info(f"Converting image with embedded color profile to sRGB: {file_path}")
+            try:
+                # Convert to sRGB using the embedded ICC profile
+                from PIL import ImageCms
+                
+                # Create sRGB profile
+                srgb_profile = ImageCms.createProfile('sRGB')
+                
+                # Get embedded profile
+                input_profile = ImageCms.ImageCmsProfile(image.info['icc_profile'])
+                
+                # Create transformation
+                transform = ImageCms.buildTransform(input_profile, srgb_profile, 'RGB', 'RGB')
+                
+                # Apply transformation
+                image = ImageCms.applyTransform(image, transform)
+                
+                logger.info(f"Successfully converted to sRGB color space")
+                
+            except Exception as e:
+                logger.warning(f"Failed to convert color profile, using image as-is: {e}")
+                # Fall back to converting to RGB without profile transformation
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+        else:
+            # No embedded profile, ensure RGB mode
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+                
         return image
         
     except (OSError, IOError) as e:

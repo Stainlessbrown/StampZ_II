@@ -919,12 +919,11 @@ Example corrections:
     def _sample_colors_from_calibration_image(self, image_path):
         """Sample RGB colors from the calibration target image."""
         try:
-            from PIL import Image
+            # Use the StampZ image loader which handles color profiles properly
+            from utils.image_processor import load_image
             
-            # Load the image
-            img = Image.open(image_path)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+            # Load the image with proper color profile conversion
+            img = load_image(image_path)
             
             width, height = img.size
             
