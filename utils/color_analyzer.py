@@ -46,7 +46,7 @@ class ColorMeasurement:
 class ColorAnalyzer:
     """Analyze colors from coordinate sample areas."""
     
-    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED, load_calibration: bool = True):
+    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED, load_calibration: bool = True, calibration_mode: bool = False):
         """Initialize color analyzer.
         
         Args:
@@ -56,12 +56,15 @@ class ColorAnalyzer:
                        SOLID_PRINTED for lithograph, photogravure, etc.
             load_calibration: Whether to load saved calibration settings.
                             Set to False for calibration sampling to avoid circular correction.
+            calibration_mode: If True, disables stamp-specific pixel filtering to allow
+                            accurate sampling of reference colors like pure white.
         """
         self.db = CoordinateDB()
         self.print_type = print_type
         self.calibrator = ColorCalibrator()
         self.color_correction = None  # Will hold correction matrix if calibrated
         self.load_calibration = load_calibration  # Remember user preference
+        self.calibration_mode = calibration_mode  # Disable stamp filtering for calibration
         
         # Load saved calibration if available and requested
         if load_calibration:
@@ -412,16 +415,19 @@ class ColorAnalyzer:
                             
                         r, g, b = pixel[:3]
                         
-                        if self.print_type == PrintType.LINE_ENGRAVED:
-                            # For line-engraved stamps, include all pixels but adjust pure white
-                            if r == 255 and g == 255 and b == 255:
-                                r, g, b = 245, 241, 235  # Slightly aged paper
-                            # Otherwise keep original values, including dark areas
-                        else:  # PrintType.SOLID_PRINTED
-                            # For solid-printed stamps, only adjust extremely light areas
-                            if r > 250 and g > 250 and b > 250:
-                                continue  # Skip only the very whitest pixels
-                            # Keep all other colors as is
+                        # Skip stamp-specific filtering when in calibration mode
+                        if not self.calibration_mode:
+                            if self.print_type == PrintType.LINE_ENGRAVED:
+                                # For line-engraved stamps, include all pixels but adjust pure white
+                                if r == 255 and g == 255 and b == 255:
+                                    r, g, b = 245, 241, 235  # Slightly aged paper
+                                # Otherwise keep original values, including dark areas
+                            else:  # PrintType.SOLID_PRINTED
+                                # For solid-printed stamps, only adjust extremely light areas
+                                if r > 250 and g > 250 and b > 250:
+                                    continue  # Skip only the very whitest pixels
+                                # Keep all other colors as is
+                        # In calibration mode, accept ALL pixels including pure white
                             
                         # Record actual pixel values without modifying them
                         pixels.append((r, g, b))

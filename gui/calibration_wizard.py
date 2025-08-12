@@ -957,8 +957,8 @@ Example corrections:
                     self.sample_size = (size, size)
                     self.anchor_position = 'center'
             
-            # Create a temporary ColorAnalyzer instance WITHOUT loading any existing calibration
-            temp_analyzer = self.analyzer.__class__(load_calibration=False)
+            # Create a temporary ColorAnalyzer instance WITHOUT loading calibration and WITH calibration mode
+            temp_analyzer = self.analyzer.__class__(load_calibration=False, calibration_mode=True)
             
             for color_name, (x, y) in color_positions.items():
                 coord = TempCoord(x, y, sample_size)
