@@ -477,13 +477,21 @@ workflow, not the display of colors within StampZ.
         # Show detailed instructions before file selection
         instruction_msg = """🎯 IMPORTANT: File Selection Order Matters!
 
-You must select your screenshot files in this EXACT order:
-1. Red screenshot (first click)
-2. Green screenshot (second click) 
-3. Blue screenshot (third click)
-4. White screenshot (fourth click)
-5. Gray screenshot (fifth click)
-6. Black screenshot (sixth click)
+Your screenshots will be arranged in this 3x2 grid layout:
+
+┌─────────┬─────────┬─────────┐
+│   RED   │  GREEN  │  BLUE   │  ← Top row
+├─────────┼─────────┼─────────┤
+│  WHITE  │  GRAY   │  BLACK  │  ← Bottom row
+└─────────┴─────────┴─────────┘
+
+Select your screenshot files in this EXACT order:
+1. Red screenshot (top-left)
+2. Green screenshot (top-center)
+3. Blue screenshot (top-right)
+4. White screenshot (bottom-left)
+5. Gray screenshot (bottom-center) 
+6. Black screenshot (bottom-right)
 
 Tip: Hold Cmd/Ctrl and click each file in sequence.
 The order you click determines the grid layout!"""
@@ -492,7 +500,7 @@ The order you click determines the grid layout!"""
         
         # Ask user to select 6 image files
         file_paths = filedialog.askopenfilenames(
-            title="Select 6 Screenshots IN ORDER: Red→Green→Blue→White→Gray→Black",
+            title="Select 6 Screenshots: Top Row (R→G→B), Bottom Row (W→G→K)",
             filetypes=[
                 ("Image files", "*.png *.jpg *.jpeg *.bmp *.tiff"),
                 ("All files", "*.*")
