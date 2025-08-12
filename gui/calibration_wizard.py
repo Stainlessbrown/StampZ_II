@@ -474,9 +474,25 @@ workflow, not the display of colors within StampZ.
     
     def _create_grid_from_screenshots(self, parent_window):
         """Create a calibration grid image from multiple screenshots."""
+        # Show detailed instructions before file selection
+        instruction_msg = """🎯 IMPORTANT: File Selection Order Matters!
+
+You must select your screenshot files in this EXACT order:
+1. Red screenshot (first click)
+2. Green screenshot (second click) 
+3. Blue screenshot (third click)
+4. White screenshot (fourth click)
+5. Gray screenshot (fifth click)
+6. Black screenshot (sixth click)
+
+Tip: Hold Cmd/Ctrl and click each file in sequence.
+The order you click determines the grid layout!"""
+        
+        messagebox.showinfo("File Selection Order", instruction_msg, parent=parent_window)
+        
         # Ask user to select 6 image files
         file_paths = filedialog.askopenfilenames(
-            title="Select 6 Screenshots (Red, Green, Blue, White, Black, Gray)",
+            title="Select 6 Screenshots IN ORDER: Red→Green→Blue→White→Gray→Black",
             filetypes=[
                 ("Image files", "*.png *.jpg *.jpeg *.bmp *.tiff"),
                 ("All files", "*.*")
