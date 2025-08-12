@@ -428,8 +428,8 @@ It guides you through capturing 6 screenshots from StampZ's basic_colors library
    - 🟢 PURE GREEN: RGB(0, 255, 0)
    - 🔵 PURE BLUE:  RGB(0, 0, 255)
    - ⚪ PURE WHITE: RGB(255, 255, 255)
-   - ⚫ PURE BLACK: RGB(0, 0, 0)
    - 🔘 50% GRAY:   RGB(128, 128, 128)
+   - ⚫ PURE BLACK: RGB(0, 0, 0)
 
 3. CREATE THE CALIBRATION GRID:
    • Click "Create Grid from Screenshots" below
