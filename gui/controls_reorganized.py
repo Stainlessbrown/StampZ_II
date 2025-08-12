@@ -323,15 +323,6 @@ class ReorganizedControlPanel(ttk.Frame):
         self.sample_frame = ttk.LabelFrame(self, text="Sample Tool")
         
         # Sample mode selection
-        # Print type selection
-        print_type_frame = ttk.Frame(self.sample_frame)
-        print_type_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        ttk.Label(print_type_frame, text="Print Type:").pack(side=tk.LEFT)
-        ttk.Radiobutton(print_type_frame, text="Solid Print",
-                       variable=self.print_type, value="solid").pack(side=tk.LEFT, padx=5)
-        ttk.Radiobutton(print_type_frame, text="Line Engraved",
-                       variable=self.print_type, value="line").pack(side=tk.LEFT)
         
         # Sample mode selection
         mode_frame = ttk.Frame(self.sample_frame)
@@ -1008,13 +999,8 @@ class ReorganizedControlPanel(ttk.Frame):
         if hasattr(self, 'main_app') and self.main_app:
             if hasattr(self.main_app, '_analyze_colors'):
                 print("DEBUG: Calling main_app._analyze_colors()")
-                print(f"DEBUG: Print type is set to: {self.print_type.get()}")
-                # Get the print type
-                selected_print_type = self.print_type.get()
-                # Get print type value for analyzer
-                print_type = "line" if selected_print_type == "line" else "solid"
-                # Pass print type to main app
-                self.main_app._analyze_colors(print_type=print_type)
+                # Call analyze colors without print type parameter
+                self.main_app._analyze_colors()
             else:
                 print("DEBUG: main_app._analyze_colors method NOT found")
                 messagebox.showinfo("Info", "Analyze colors method not found in main app")

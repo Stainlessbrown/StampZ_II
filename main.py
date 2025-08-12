@@ -1005,7 +1005,7 @@ class StampZApp:
             default_color = self.control_panel.line_color.get()
             self.canvas.set_line_color(default_color)
 
-    def _analyze_colors(self, print_type="solid"):
+    def _analyze_colors(self):
         if not hasattr(self.canvas, '_coord_markers') or not self.canvas._coord_markers:
             messagebox.showwarning(
                 "No Samples", 
@@ -1029,11 +1029,9 @@ class StampZApp:
             return
         
         try:
-            from utils.color_analyzer import ColorAnalyzer, PrintType
-            # Create analyzer with appropriate print type
-            analyzer = ColorAnalyzer(
-                print_type=PrintType.LINE_ENGRAVED if print_type == "line" else PrintType.SOLID_PRINTED
-            )
+            from utils.color_analyzer import ColorAnalyzer
+            # Create analyzer
+            analyzer = ColorAnalyzer()
             
             if not self.current_file:
                 messagebox.showerror("Error", "No image loaded. Please open an image first.")
