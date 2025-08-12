@@ -43,10 +43,17 @@ def apply_per_color_corrections(r, g, b, corrections):
         corrected_b = max(0, min(255, b + red_corrections.get('blue_correction', 0)))
         
     else:
-        # Mixed color - apply universal corrections from the enhanced matrix
-        corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
-        corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
-        corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
+        # Mixed/neutral color - use neutral color corrections if available, otherwise universal
+        if 'neutral_colors' in corrections['per_color_corrections']:
+            neutral_corrections = corrections['per_color_corrections']['neutral_colors']
+            corrected_r = max(0, min(255, r + neutral_corrections.get('red_correction', 0)))
+            corrected_g = max(0, min(255, g + neutral_corrections.get('green_correction', 0)))
+            corrected_b = max(0, min(255, b + neutral_corrections.get('blue_correction', 0)))
+        else:
+            # Fallback to universal corrections from the enhanced matrix
+            corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
+            corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
+            corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
     
     return (int(round(corrected_r)), int(round(corrected_g)), int(round(corrected_b)))
 
