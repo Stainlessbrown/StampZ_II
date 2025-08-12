@@ -798,44 +798,9 @@ class ColorAnalyzer:
         return measurements
     
     def load_saved_calibration(self):
-        """Load saved calibration settings, preferring enhanced calibration over legacy preferences."""
-        # Try enhanced calibration first (preferred for accuracy)
-        if self._load_enhanced_calibration():
-            return True
-            
-        # Fall back to legacy preferences file
-        try:
-            import json
-            # Use full path to StampZ preferences file
-            prefs_file = os.path.expanduser("~/Library/Application Support/StampZ/preferences.json")
-            
-            if os.path.exists(prefs_file):
-                with open(prefs_file, 'r') as f:
-                    prefs = json.load(f)
-                
-                calibration = prefs.get('color_calibration', {})
-                if calibration.get('enabled', False):
-                    correction_matrix = calibration.get('correction_matrix')
-                    if correction_matrix:
-                        # Check if this is obviously faulty calibration (all zeros)
-                        r_corr = correction_matrix.get('red_correction', 0)
-                        g_corr = correction_matrix.get('green_correction', 0)
-                        b_corr = correction_matrix.get('blue_correction', 0)
-                        
-                        if abs(r_corr) < 0.1 and abs(g_corr) < 0.1 and abs(b_corr) < 0.1:
-                            print(f"Warning: Legacy calibration has zero corrections (R{r_corr:+.1f}, G{g_corr:+.1f}, B{b_corr:+.1f}) - likely from perfect reference colors")
-                            print("Consider running the calibration wizard with real screenshot colors for better accuracy")
-                            # Still load it as it might be legitimately perfect, but warn the user
-                        
-                        self.color_correction = correction_matrix
-                        print(f"Loaded legacy calibration: R{r_corr:+.1f}, G{g_corr:+.1f}, B{b_corr:+.1f}")
-                        return True
-            
-            return False
-            
-        except Exception as e:
-            print(f"Warning: Could not load calibration settings: {e}")
-            return False
+        """Load saved calibration settings from enhanced calibration system only."""
+        # Only use enhanced calibration (accurate and comprehensive)
+        return self._load_enhanced_calibration()
     
     def _load_enhanced_calibration(self):
         """Try to load enhanced calibration files."""

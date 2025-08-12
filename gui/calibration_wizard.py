@@ -844,36 +844,11 @@ Example corrections:
             messagebox.showerror("Error", f"Failed to apply calibration: {e}")
     
     def save_calibration_preferences(self):
-        """Save calibration settings to preferences file."""
+        """Save calibration settings to enhanced calibration file only."""
         try:
-            # Determine appropriate preferences location based on platform and bundling
-            prefs_file = self._get_preferences_file_path()
-            
-            # Ensure preferences directory exists
-            os.makedirs(os.path.dirname(prefs_file), exist_ok=True)
-            
-            # Load existing preferences
-            prefs = {}
-            if os.path.exists(prefs_file):
-                with open(prefs_file, 'r') as f:
-                    prefs = json.load(f)
-            
-            # Add calibration data
-            prefs['color_calibration'] = {
-                'enabled': True,
-                'correction_matrix': self.correction_matrix,
-                'calibration_date': str(datetime.now()),
-                'measured_colors': self.measured_colors
-            }
-            
-            # Save preferences
-            with open(prefs_file, 'w') as f:
-                json.dump(prefs, f, indent=2)
-            
-            # Also save as standalone calibration file for the color correction calculator
+            # Only save enhanced calibration file (no legacy preferences)
             self._save_calibration_file()
-            
-            print(f"Calibration settings saved to {prefs_file}")
+            print(f"Enhanced calibration settings saved")
             
         except Exception as e:
             print(f"Warning: Could not save calibration preferences: {e}")
