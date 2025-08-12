@@ -222,6 +222,17 @@ class ReorganizedControlPanel(ttk.Frame):
         ttk.Radiobutton(mode_row, text="Sample", value="coord",
                        variable=self.tool_mode, command=self._on_tool_mode_change,
                        style='Compact.TRadiobutton').pack(side=tk.LEFT, padx=1)
+        
+        # SECTION 5: Line Color (always visible for marker visibility)
+        color_row = ttk.Frame(self)
+        color_row.pack(fill=tk.X, padx=2, pady=1)
+        
+        ttk.Label(color_row, text="Line Color:", font=('Arial', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
+        color_combo = ttk.Combobox(color_row, textvariable=self.line_color, 
+                                  values=["white", "red", "green", "blue", "yellow", "magenta", "cyan", "black"],
+                                  state='readonly', width=8)
+        color_combo.pack(side=tk.LEFT, padx=2)
+        color_combo.bind('<<ComboboxSelected>>', lambda e: self._on_line_color_change())
 
     def _create_context_sensitive_sections(self):
         """Create tool-specific control sections (hidden by default)."""
