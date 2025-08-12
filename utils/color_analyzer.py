@@ -61,6 +61,7 @@ class ColorAnalyzer:
         self.print_type = print_type
         self.calibrator = ColorCalibrator()
         self.color_correction = None  # Will hold correction matrix if calibrated
+        self.load_calibration = load_calibration  # Remember user preference
         
         # Load saved calibration if available and requested
         if load_calibration:
@@ -849,8 +850,11 @@ class ColorAnalyzer:
             Corrected RGB tuple (or original if not calibrated)
         """
         if self.color_correction is None:
-            # Try to load enhanced calibration
-            if not self._load_enhanced_calibration():
+            # Only try to load calibration if it was requested during init
+            if self.load_calibration and not self._load_enhanced_calibration():
+                return rgb
+            elif not self.load_calibration:
+                # Explicitly disabled calibration loading
                 return rgb
         
         # Convert to int tuple for correction
