@@ -533,8 +533,9 @@ The order you click determines the grid layout!"""
             
             # Paste images into the grid
             for i, img in enumerate(images):
-                # Resize image to the smallest dimensions
-                resized_img = img.resize((min_width, min_height), Image.Resampling.LANCZOS)
+                # Resize image to the smallest dimensions using NEAREST resampling
+                # to preserve perfect color values for reference colors
+                resized_img = img.resize((min_width, min_height), Image.Resampling.NEAREST)
                 grid_image.paste(resized_img, positions[i])
             
             # Save the final grid image
