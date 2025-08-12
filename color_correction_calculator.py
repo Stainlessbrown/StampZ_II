@@ -6,7 +6,7 @@ Based on your system's known color shifts determined through calibration testing
 Usage: python3 color_correction_calculator.py
 """
 
-def correct_color(r, g, b, method='universal'):
+def correct_color(r, g, b, method='universal', calibration_file=None):
     """
     Apply manual corrections based on your system's known shifts.
     
@@ -17,11 +17,42 @@ def correct_color(r, g, b, method='universal'):
     
     Args:
         r, g, b: Measured RGB values from StampZ
-        method: 'universal' (recommended) or 'color_specific'
+        method: 'universal' (recommended), 'color_specific', or 'dynamic'
+        calibration_file: Path to calibration JSON file (for dynamic method)
         
     Returns:
         Corrected RGB tuple and method used
     """
+    
+    # Try dynamic calibration first if available
+    if method == 'dynamic' or calibration_file:
+        try:
+            import json
+            import os
+            
+            # Default calibration file location
+            if not calibration_file:
+                calibration_file = 'stampz_calibration.json'
+            
+            if os.path.exists(calibration_file):
+                with open(calibration_file, 'r') as f:
+                    calibration_data = json.load(f)
+                
+                if 'calibration_matrix' in calibration_data:
+                    corrections = calibration_data['calibration_matrix']['corrections']
+                    
+                    # Apply dynamic corrections
+                    corrected_r = max(0, min(255, r + corrections.get('red_correction', 0)))
+                    corrected_g = max(0, min(255, g + corrections.get('green_correction', 0)))
+                    corrected_b = max(0, min(255, b + corrections.get('blue_correction', 0)))
+                    
+                    corrected = (int(round(corrected_r)), int(round(corrected_g)), int(round(corrected_b)))
+                    method_used = 'Dynamic (from calibration file)'
+                    
+                    return corrected, method_used
+        except Exception as e:
+            print(f"Warning: Could not load dynamic calibration: {e}")
+            # Fall back to universal method
     
     if method == 'universal':
         # Universal channel corrections - works for ANY color
