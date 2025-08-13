@@ -19,6 +19,7 @@ class ExportPreferences:
     export_filename_format: str = "{sample_set}_{date}"  # Template for filename
     include_timestamp: bool = False  # Whether to include timestamp in filename
     preferred_export_format: str = "ods"  # Preferred export format: 'ods', 'xlsx', or 'csv'
+    export_normalized_values: bool = False  # Export color values normalized to 0.0-1.0 range
 
 
 @dataclass
@@ -200,6 +201,24 @@ class PreferencesManager:
             print(f"Error setting preferred export format: {e}")
             return False
     
+    def get_export_normalized_values(self) -> bool:
+        """Get whether to export color values normalized to 0.0-1.0 range."""
+        return self.preferences.export_prefs.export_normalized_values
+    
+    def set_export_normalized_values(self, normalized: bool) -> bool:
+        """Set whether to export color values normalized to 0.0-1.0 range.
+        
+        Args:
+            normalized: True to export normalized values (0.0-1.0), False for standard ranges
+        """
+        try:
+            self.preferences.export_prefs.export_normalized_values = normalized
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting normalized export preference: {e}")
+            return False
+    
     def get_default_color_library(self) -> str:
         """Get the default color library."""
         return self.preferences.color_library_prefs.default_library
@@ -286,7 +305,8 @@ class PreferencesManager:
                         auto_open_after_export=export_data.get('auto_open_after_export', True),
                         export_filename_format=export_data.get('export_filename_format', '{sample_set}_{date}'),
                         include_timestamp=export_data.get('include_timestamp', False),
-                        preferred_export_format=export_data.get('preferred_export_format', 'ods')
+                        preferred_export_format=export_data.get('preferred_export_format', 'ods'),
+                        export_normalized_values=export_data.get('export_normalized_values', False)
                     )
                 
                 # Load file dialog preferences

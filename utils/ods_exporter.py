@@ -319,11 +319,90 @@ class ODSExporter:
         
         return coordinate_info
     
+    def _normalize_rgb(self, rgb_value: float) -> str:
+        """Convert RGB (0-255) to normalized (0.0-1.0) with 4 decimal places."""
+        return f"{rgb_value/255.0:.4f}"
+    
+    def _normalize_lab_l(self, l_value: float) -> str:
+        """Convert L* (0-100) to normalized (0.0-1.0) with 4 decimal places."""
+        return f"{l_value/100.0:.4f}"
+    
+    def _normalize_lab_ab(self, ab_value: float) -> str:
+        """Convert a*/b* (-128 to +127) to normalized (0.0-1.0) with 4 decimal places.
+        
+        Note: This assumes typical a*/b* range of -128 to +127 (256 total range).
+        The formula is: (value + 128) / 255 to map to 0.0-1.0
+        """
+        return f"{(ab_value + 128.0)/255.0:.4f}"
+    
+    def _get_export_headers(self, use_normalized: bool) -> List[str]:
+        """Get column headers based on normalization preference."""
+        if use_normalized:
+            return ["L*_norm", "a*_norm", "b*_norm", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
+                   "R_norm", "G_norm", "B_norm", "DataID_2", "Date", "Notes", "Calculations", "Averages", "Analysis"]
+        else:
+            return ["L*", "a*", "b*", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
+                   "R", "G", "B", "DataID_2", "Date", "Notes", "Calculations", "Averages", "Analysis"]
+    
+    def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
+        """Format measurement values based on normalization preference."""
+        if use_normalized:
+            return [
+                self._normalize_lab_l(measurement.l_value),
+                self._normalize_lab_ab(measurement.a_value),
+                self._normalize_lab_ab(measurement.b_value),
+                measurement.data_id,
+                f"{measurement.x_position:.1f}",
+                f"{measurement.y_position:.1f}",
+                measurement.sample_shape,
+                measurement.sample_size,
+                measurement.sample_anchor,
+                self._normalize_rgb(measurement.rgb_r),
+                self._normalize_rgb(measurement.rgb_g),
+                self._normalize_rgb(measurement.rgb_b),
+                measurement.data_id,  # Duplicate DataID column
+                measurement.measurement_date,
+                measurement.notes or '',
+                '',  # Calculations column
+                '',  # Averages column
+                ''   # Analysis column
+            ]
+        else:
+            return [
+                f"{measurement.l_value:.2f}",
+                f"{measurement.a_value:.2f}",
+                f"{measurement.b_value:.2f}",
+                measurement.data_id,
+                f"{measurement.x_position:.1f}",
+                f"{measurement.y_position:.1f}",
+                measurement.sample_shape,
+                measurement.sample_size,
+                measurement.sample_anchor,
+                f"{measurement.rgb_r:.2f}",
+                f"{measurement.rgb_g:.2f}",
+                f"{measurement.rgb_b:.2f}",
+                measurement.data_id,  # Duplicate DataID column
+                measurement.measurement_date,
+                measurement.notes or '',
+                '',  # Calculations column
+                '',  # Averages column
+                ''   # Analysis column
+            ]
+    
     def create_ods_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
         """Create an ODS document with the color measurements."""
         if not ODF_AVAILABLE:
             raise RuntimeError("odfpy library not available. Cannot create ODS document.")
-            
+        
+        # Check if normalized export is enabled
+        use_normalized = False
+        if self.prefs_manager:
+            use_normalized = self.prefs_manager.get_export_normalized_values()
+            if use_normalized:
+                print("DEBUG: Using normalized export format (0.0-1.0 range)")
+            else:
+                print("DEBUG: Using standard export format")
+        
         # Create new document
         doc = OpenDocumentSpreadsheet()
         
@@ -332,7 +411,7 @@ class ODSExporter:
         
         # Add header row
         header_row = TableRow()
-        headers = ["L*", "a*", "b*", "DataID", "X", "Y", "Shape", "Size", "Anchor", "R", "G", "B", "DataID", "Date", "Notes", "Calculations", "Averages", "Analysis"]
+        headers = self._get_export_headers(use_normalized)
         
         for header in headers:
             cell = TableCell()
@@ -345,27 +424,8 @@ class ODSExporter:
         for measurement in measurements:
             row = TableRow()
             
-            # Create cells for each column
-            data = [
-                f"{measurement.l_value:.2f}",
-                f"{measurement.a_value:.2f}", 
-                f"{measurement.b_value:.2f}",
-                measurement.data_id,
-                f"{measurement.x_position:.1f}",
-                f"{measurement.y_position:.1f}",
-                measurement.sample_shape,
-                measurement.sample_size,
-                measurement.sample_anchor,
-                f"{measurement.rgb_r:.2f}",
-                f"{measurement.rgb_g:.2f}",
-                f"{measurement.rgb_b:.2f}",
-                measurement.data_id,
-                measurement.measurement_date,
-                measurement.notes or "",
-                "",  # Calculations column (P)
-                "",  # Averages column (Q) 
-                ""   # Analysis column (R)
-            ]
+            # Create cells for each column using normalized or standard formatting
+            data = self._format_measurement_values(measurement, use_normalized)
             
             # Define which columns contain numeric data
             numeric_columns = [0, 1, 2, 4, 5, 9, 10, 11]  # L*, a*, b*, X, Y, R, G, B
@@ -450,29 +510,62 @@ class ODSExporter:
             # Sort measurements by date for chronological order in spreadsheet
             measurements.sort(key=lambda x: x.measurement_date)
             
+            # Check if normalized export is enabled
+            use_normalized = False
+            if self.prefs_manager:
+                use_normalized = self.prefs_manager.get_export_normalized_values()
+                if use_normalized:
+                    print("DEBUG: Using normalized export format (0.0-1.0 range) for XLSX")
+                else:
+                    print("DEBUG: Using standard export format for XLSX")
+            
             # Convert measurements to DataFrame
             data = []
             for measurement in measurements:
-                data.append({
-                    'L*': measurement.l_value,
-                    'a*': measurement.a_value,
-                    'b*': measurement.b_value,
-                    'DataID': measurement.data_id,
-                    'X': measurement.x_position,
-                    'Y': measurement.y_position,
-                    'Shape': measurement.sample_shape,
-                    'Size': measurement.sample_size,
-                    'Anchor': measurement.sample_anchor,
-                    'R': measurement.rgb_r,
-                    'G': measurement.rgb_g,
-                    'B': measurement.rgb_b,
-                    'DataID_2': measurement.data_id,  # Duplicate column for compatibility
-                    'Date': measurement.measurement_date,
-                    'Notes': measurement.notes or '',
-                    'Calculations': '',  # Empty column for user calculations
-                    'Averages': '',      # Empty column for user averages
-                    'Analysis': ''       # Empty column for user analysis
-                })
+                if use_normalized:
+                    # Use normalized values
+                    data.append({
+                        'L*_norm': float(self._normalize_lab_l(measurement.l_value)),
+                        'a*_norm': float(self._normalize_lab_ab(measurement.a_value)),
+                        'b*_norm': float(self._normalize_lab_ab(measurement.b_value)),
+                        'DataID': measurement.data_id,
+                        'X': measurement.x_position,
+                        'Y': measurement.y_position,
+                        'Shape': measurement.sample_shape,
+                        'Size': measurement.sample_size,
+                        'Anchor': measurement.sample_anchor,
+                        'R_norm': float(self._normalize_rgb(measurement.rgb_r)),
+                        'G_norm': float(self._normalize_rgb(measurement.rgb_g)),
+                        'B_norm': float(self._normalize_rgb(measurement.rgb_b)),
+                        'DataID_2': measurement.data_id,  # Duplicate column for compatibility
+                        'Date': measurement.measurement_date,
+                        'Notes': measurement.notes or '',
+                        'Calculations': '',  # Empty column for user calculations
+                        'Averages': '',      # Empty column for user averages
+                        'Analysis': ''       # Empty column for user analysis
+                    })
+                else:
+                    # Use standard values
+                    data.append({
+                        'L*': measurement.l_value,
+                        'a*': measurement.a_value,
+                        'b*': measurement.b_value,
+                        'DataID': measurement.data_id,
+                        'X': measurement.x_position,
+                        'Y': measurement.y_position,
+                        'Shape': measurement.sample_shape,
+                        'Size': measurement.sample_size,
+                        'Anchor': measurement.sample_anchor,
+                        'R': measurement.rgb_r,
+                        'G': measurement.rgb_g,
+                        'B': measurement.rgb_b,
+                        'DataID_2': measurement.data_id,  # Duplicate column for compatibility
+                        'Date': measurement.measurement_date,
+                        'Notes': measurement.notes or '',
+                        'Calculations': '',  # Empty column for user calculations
+                        'Averages': '',      # Empty column for user averages
+                        'Analysis': ''       # Empty column for user analysis
+                    })
             
             df = pd.DataFrame(data)
             
@@ -525,9 +618,17 @@ class ODSExporter:
             # Ensure output directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            # Define headers
-            headers = ['L*', 'a*', 'b*', 'DataID', 'X', 'Y', 'Shape', 'Size', 'Anchor', 
-                      'R', 'G', 'B', 'DataID_2', 'Date', 'Notes', 'Calculations', 'Averages', 'Analysis']
+            # Check if normalized export is enabled
+            use_normalized = False
+            if self.prefs_manager:
+                use_normalized = self.prefs_manager.get_export_normalized_values()
+                if use_normalized:
+                    print("DEBUG: Using normalized export format (0.0-1.0 range) for CSV")
+                else:
+                    print("DEBUG: Using standard export format for CSV")
+            
+            # Define headers based on normalization preference
+            headers = self._get_export_headers(use_normalized)
             
             # Write CSV file
             with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
@@ -538,26 +639,7 @@ class ODSExporter:
                 
                 # Write data rows
                 for measurement in measurements:
-                    row = [
-                        f"{measurement.l_value:.2f}",
-                        f"{measurement.a_value:.2f}",
-                        f"{measurement.b_value:.2f}",
-                        measurement.data_id,
-                        f"{measurement.x_position:.1f}",
-                        f"{measurement.y_position:.1f}",
-                        measurement.sample_shape,
-                        measurement.sample_size,
-                        measurement.sample_anchor,
-                        f"{measurement.rgb_r:.2f}",
-                        f"{measurement.rgb_g:.2f}",
-                        f"{measurement.rgb_b:.2f}",
-                        measurement.data_id,  # Duplicate DataID column
-                        measurement.measurement_date,
-                        measurement.notes or '',
-                        '',  # Calculations column
-                        '',  # Averages column
-                        ''   # Analysis column
-                    ]
+                    row = self._format_measurement_values(measurement, use_normalized)
                     writer.writerow(row)
             
             print(f"Successfully exported {len(measurements)} measurements to: {output_path}")
