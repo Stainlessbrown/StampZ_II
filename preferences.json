@@ -4,11 +4,15 @@
     "auto_open_after_export": true,
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
-    "preferred_export_format": "ods"
+    "preferred_export_format": "ods",
+    "export_normalized_values": false
   },
   "file_dialog_prefs": {
     "last_open_directory": "",
     "last_save_directory": "",
     "remember_directories": true
+  },
+  "color_library_prefs": {
+    "default_library": "basic_colors"
   }
 }

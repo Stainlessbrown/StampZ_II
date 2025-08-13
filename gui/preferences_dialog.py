@@ -296,7 +296,22 @@ class PreferencesDialog:
             behavior_frame,
             text="Automatically open exported files after export",
             variable=self.auto_open_var
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Color value format section
+        self.export_normalized_var = tk.BooleanVar()
+        ttk.Checkbutton(
+            behavior_frame,
+            text="Export color values normalized to 0.0-1.0 range",
+            variable=self.export_normalized_var
         ).pack(anchor=tk.W)
+        
+        ttk.Label(
+            behavior_frame,
+            text="When enabled, RGB and L*a*b* values are exported as normalized decimals (0.0-1.0).\nWhen disabled, standard ranges are used (RGB: 0-255, L*a*b*: full scale).",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(5, 0))
     
     def _create_file_dialog_tab(self, notebook):
         """Create the file dialog preferences tab."""
@@ -483,6 +498,9 @@ class PreferencesDialog:
         # Export behavior
         self.auto_open_var.set(prefs.auto_open_after_export)
         
+        # Normalized export values
+        self.export_normalized_var.set(prefs.export_normalized_values)
+        
         # File dialog preferences
         dialog_prefs = self.prefs_manager.preferences.file_dialog_prefs
         self.remember_directories_var.set(dialog_prefs.remember_directories)
@@ -585,6 +603,9 @@ class PreferencesDialog:
             
             # Export behavior
             self.prefs_manager.preferences.export_prefs.auto_open_after_export = self.auto_open_var.get()
+            
+            # Normalized export values
+            self.prefs_manager.set_export_normalized_values(self.export_normalized_var.get())
             
             # File dialog preferences
             self.prefs_manager.set_remember_directories(self.remember_directories_var.get())
