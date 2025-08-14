@@ -3,19 +3,27 @@ Geometry utilities for the StampZ application.
 Handles vertex management, polygon validation, and geometric calculations.
 """
 
-from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import math
 from enum import Enum, auto
 
 
-@dataclass
 class Point:
     """
     Represents a 2D point/vertex with x, y coordinates.
     """
-    x: float
-    y: float
+    
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+    
+    def __repr__(self):
+        return f"Point(x={self.x}, y={self.y})"
+    
+    def __eq__(self, other):
+        if not isinstance(other, Point):
+            return False
+        return self.x == other.x and self.y == other.y
 
     def distance_to(self, other: 'Point') -> float:
         """Calculate Euclidean distance to another point."""
