@@ -340,11 +340,25 @@ class StampZApp:
             self.control_panel.vertex_count.set(count)
 
     def show_about(self):
+        try:
+            from __init__ import __version__, __app_name__, __description__
+        except ImportError:
+            __version__ = "Unknown"
+            __app_name__ = "StampZ"
+            __description__ = "Image analysis and color analysis tool"
+        
         messagebox.showinfo(
-            "About StampZ",
-            "StampZ\n\n"
-            "An image cropping tool and color analysis tool optimized for philatelic images.\n"
-            "Supports polygon selection and high-quality output."
+            f"About {__app_name__}",
+            f"{__app_name__} v{__version__}\n\n"
+            f"{__description__}\n\n"
+            "Features:\n"
+            "• Image cropping with polygon selection\n"
+            "• Color analysis and measurement\n"
+            "• Compare mode for color averaging\n"
+            "• Export to ODS, XLSX, and CSV formats\n"
+            "• Color library management\n"
+            "• Spectral analysis tools\n\n"
+            "Built for precision philatelic analysis."
         )
 
     def _adjust_vertex_count(self, delta: int):
