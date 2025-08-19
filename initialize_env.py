@@ -271,9 +271,24 @@ else:
     app_bundle_dir = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     logger.info(f"Running from Python environment: {app_bundle_dir}")
 
-# Get user data directory
-user_data_dir = get_app_data_dir()
-logger.info(f"User data directory: {user_data_dir}")
+# Get user data directory - check if we're in development mode first
+if getattr(sys, 'frozen', False):
+    # Running as packaged app - use system directories
+    user_data_dir = get_app_data_dir()
+    logger.info(f"Packaged app mode - User data directory: {user_data_dir}")
+else:
+    # Running from source - check if we're in a development directory
+    script_dir = Path(__file__).parent.absolute()
+    
+    # If running from a directory that looks like development (contains main.py, gui/, utils/)
+    if (script_dir / 'main.py').exists() and (script_dir / 'gui').exists():
+        # Development mode - use relative data directory
+        user_data_dir = script_dir
+        logger.info(f"Development mode - Using local directory: {user_data_dir}")
+    else:
+        # Running from installed Python but not in dev folder - use system directories
+        user_data_dir = get_app_data_dir()
+        logger.info(f"Installed Python mode - User data directory: {user_data_dir}")
 
 # *** DATA PRESERVATION SYSTEM ***
 # Check for existing user data and create backups or restore as needed
