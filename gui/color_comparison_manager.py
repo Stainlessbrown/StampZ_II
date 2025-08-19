@@ -613,23 +613,61 @@ class ColorComparisonManager(tk.Frame):
             Sample set name (database name) that contains individual measurements for this image,
             or None if not found
         """
+        # Create debug log file in user's home directory
+        import os
+        from datetime import datetime
+        debug_log = os.path.expanduser('~/StampZ_Compare_Debug.log')
+        
+        def log_debug(message):
+            try:
+                with open(debug_log, 'a', encoding='utf-8') as f:
+                    f.write(f"[{datetime.now()}] {message}\n")
+            except:
+                pass
+        
+        log_debug(f"=== _find_database_for_image called for '{image_name}' ===")
+        
         try:
             import os
             from utils.color_analysis_db import ColorAnalysisDB
             
-            # Get all database files
-            db_dir = 'data/color_analysis'
-            if not os.path.exists(db_dir):
+            # Try multiple possible database directories
+            possible_dirs = [
+                'data/color_analysis',  # Development relative path
+                os.path.join(os.path.expanduser('~/Library/Application Support/StampZ'), 'data', 'color_analysis'),  # macOS app support
+                os.path.join(os.getenv('STAMPZ_DATA_DIR', ''), 'data', 'color_analysis') if os.getenv('STAMPZ_DATA_DIR') else None
+            ]
+            
+            # Filter out None values
+            possible_dirs = [d for d in possible_dirs if d]
+            
+            log_debug(f"Checking directories: {possible_dirs}")
+            
+            db_dir = None
+            for test_dir in possible_dirs:
+                if os.path.exists(test_dir):
+                    db_dir = test_dir
+                    log_debug(f"Found existing directory: {db_dir}")
+                    break
+                else:
+                    log_debug(f"Directory not found: {test_dir}")
+            
+            if not db_dir:
+                log_debug("No database directory found")
                 return None
                 
             db_files = [f for f in os.listdir(db_dir) if f.endswith('.db')]
+            log_debug(f"Database files found: {db_files}")
             
             # Check each database for individual measurements with this image name
             for db_file in db_files:
                 try:
                     sample_set_name = os.path.splitext(db_file)[0]
+                    log_debug(f"Checking database: {sample_set_name}")
+                    
                     db = ColorAnalysisDB(sample_set_name)
                     all_measurements = db.get_all_measurements()
+                    log_debug(f"  Total measurements: {len(all_measurements)}")
                     
                     # Look for individual measurements (not averaged) with this image name
                     individual_measurements = [
@@ -637,18 +675,24 @@ class ColorComparisonManager(tk.Frame):
                         if not m.get('is_averaged', False) and m.get('image_name') == image_name
                     ]
                     
+                    log_debug(f"  Individual measurements for '{image_name}': {len(individual_measurements)}")
+                    
                     if individual_measurements:
+                        log_debug(f"SUCCESS: Found {len(individual_measurements)} individual measurements for image '{image_name}' in database '{sample_set_name}'")
                         print(f"DEBUG: Found {len(individual_measurements)} individual measurements for image '{image_name}' in database '{sample_set_name}'")
                         return sample_set_name
                         
                 except Exception as e:
+                    log_debug(f"  Error checking database {db_file}: {e}")
                     print(f"DEBUG: Error checking database {db_file}: {e}")
                     continue
             
+            log_debug(f"FAILURE: No database found containing individual measurements for image '{image_name}'")
             print(f"DEBUG: No database found containing individual measurements for image '{image_name}'")
             return None
             
         except Exception as e:
+            log_debug(f"ERROR in _find_database_for_image: {e}")
             print(f"DEBUG: Error in _find_database_for_image: {e}")
             return None
     
