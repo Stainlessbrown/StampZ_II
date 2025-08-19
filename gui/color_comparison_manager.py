@@ -392,7 +392,12 @@ class ColorComparisonManager(tk.Frame):
         # Add the button at the bottom right of values_frame
         add_button = ttk.Button(values_frame, text="Add color to library", 
                               command=lambda: self._add_color_to_library(avg_rgb, avg_lab))
-        add_button.pack(anchor='se')
+        add_button.pack(anchor='se', pady=(0, 5))
+        
+        # Add Save Average to Database button
+        save_button = ttk.Button(values_frame, text="Save Average to Database", 
+                               command=lambda: self._save_average_to_database(avg_rgb, avg_lab, enabled_samples))
+        save_button.pack(anchor='se')
     
     def _add_color_to_library(self, rgb_values, lab_values):
         """Handle adding the current average color to a library."""
@@ -501,6 +506,91 @@ class ColorComparisonManager(tk.Frame):
         
         # Focus the name entry
         name_entry.focus_set()
+    
+    def _save_average_to_database(self, avg_rgb, avg_lab, enabled_samples):
+        """Save the averaged color data to the database for export.
+        
+        Args:
+            avg_rgb: Averaged RGB values
+            avg_lab: Averaged Lab values
+            enabled_samples: List of enabled sample points used for averaging
+        """
+        try:
+            if not enabled_samples:
+                messagebox.showerror("Error", "No samples enabled for averaging")
+                return
+            
+            # Check if we have a current image loaded
+            if not self.current_image or not hasattr(self, 'filename_label'):
+                messagebox.showerror("Error", "No image data available")
+                return
+            
+            # Get image name from the filename label
+            filename = self.filename_label.cget("text")
+            if filename == "No file loaded":
+                messagebox.showerror("Error", "No file loaded")
+                return
+            
+            image_name = os.path.splitext(filename)[0]
+            
+            # Create sample set name for the compare data
+            sample_set_name = f"Compare_{image_name}"
+            
+            # Convert enabled samples to the format expected by ColorAnalyzer
+            sample_measurements = []
+            for i, sample in enumerate(enabled_samples, 1):
+                measurement = {
+                    'id': f"compare_{i}",
+                    'l_value': self.library.rgb_to_lab(sample['rgb'])[0] if self.library else 0,
+                    'a_value': self.library.rgb_to_lab(sample['rgb'])[1] if self.library else 0,
+                    'b_value': self.library.rgb_to_lab(sample['rgb'])[2] if self.library else 0,
+                    'rgb_r': sample['rgb'][0],
+                    'rgb_g': sample['rgb'][1],
+                    'rgb_b': sample['rgb'][2],
+                    'x_position': sample['position'][0],
+                    'y_position': sample['position'][1],
+                    'sample_type': sample['type'],
+                    'sample_width': sample['size'][0],
+                    'sample_height': sample['size'][1],
+                    'anchor': sample['anchor']
+                }
+                sample_measurements.append(measurement)
+            
+            # Use ColorAnalyzer to save the averaged measurement
+            from utils.color_analyzer import ColorAnalyzer
+            analyzer = ColorAnalyzer()
+            
+            notes = f"Compare mode average from {len(enabled_samples)} enabled samples"
+            success = analyzer.save_averaged_measurement_from_samples(
+                sample_measurements=sample_measurements,
+                sample_set_name=sample_set_name,
+                image_name=image_name,
+                notes=notes
+            )
+            
+            if success:
+                messagebox.showinfo(
+                    "Success",
+                    f"Successfully saved averaged color data to database!\n\n"
+                    f"Sample Set: {sample_set_name}\n"
+                    f"Image: {image_name}\n"
+                    f"Averaged from {len(enabled_samples)} samples\n\n"
+                    f"This data will now be included in exports."
+                )
+            else:
+                messagebox.showerror(
+                    "Error",
+                    "Failed to save averaged color data to database."
+                )
+                
+        except Exception as e:
+            print(f"Error saving averaged measurement: {e}")
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror(
+                "Error",
+                f"Failed to save averaged color data:\n\n{str(e)}"
+            )
     
     def _refresh_library_manager(self, library_name: str):
         """Refresh the library manager display if it's open.

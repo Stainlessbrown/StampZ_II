@@ -751,6 +751,90 @@ class ColorAnalyzer:
         
         return measurements
     
+    def save_averaged_measurement_from_samples(
+        self,
+        sample_measurements: List[dict],
+        sample_set_name: str,
+        image_name: str,
+        notes: Optional[str] = None
+    ) -> bool:
+        """Save an averaged measurement from a list of individual sample measurements.
+        
+        Args:
+            sample_measurements: List of individual measurements to average
+            sample_set_name: Name of the sample set
+            image_name: Name of the image being analyzed
+            notes: Optional notes about the averaging
+            
+        Returns:
+            True if save was successful
+        """
+        try:
+            if not sample_measurements:
+                print("No sample measurements provided for averaging")
+                return False
+                
+            # Calculate averaged Lab and RGB values
+            lab_values = []
+            rgb_values = []
+            
+            for measurement in sample_measurements:
+                lab = (
+                    measurement.get('l_value', 0),
+                    measurement.get('a_value', 0),
+                    measurement.get('b_value', 0)
+                )
+                rgb = (
+                    measurement.get('rgb_r', 0),
+                    measurement.get('rgb_g', 0),
+                    measurement.get('rgb_b', 0)
+                )
+                lab_values.append(lab)
+                rgb_values.append(rgb)
+            
+            # Calculate averages
+            avg_lab = (
+                sum(lab[0] for lab in lab_values) / len(lab_values),
+                sum(lab[1] for lab in lab_values) / len(lab_values),
+                sum(lab[2] for lab in lab_values) / len(lab_values)
+            )
+            avg_rgb = (
+                sum(rgb[0] for rgb in rgb_values) / len(rgb_values),
+                sum(rgb[1] for rgb in rgb_values) / len(rgb_values),
+                sum(rgb[2] for rgb in rgb_values) / len(rgb_values)
+            )
+            
+            # Create color analysis database instance
+            from .color_analysis_db import ColorAnalysisDB
+            db = ColorAnalysisDB(sample_set_name)
+            
+            # Create or get measurement set
+            set_id = db.create_measurement_set(image_name, "Averaged measurement analysis")
+            if set_id is None:
+                print("Failed to create measurement set for averaged data")
+                return False
+            
+            # Save the averaged measurement
+            success = db.save_averaged_measurement(
+                set_id=set_id,
+                averaged_lab=avg_lab,
+                averaged_rgb=avg_rgb,
+                source_measurements=sample_measurements,
+                image_name=image_name,
+                notes=notes
+            )
+            
+            if success:
+                print(f"Successfully saved averaged measurement from {len(sample_measurements)} samples")
+                print(f"Averaged Lab: ({avg_lab[0]:.2f}, {avg_lab[1]:.2f}, {avg_lab[2]:.2f})")
+                print(f"Averaged RGB: ({avg_rgb[0]:.2f}, {avg_rgb[1]:.2f}, {avg_rgb[2]:.2f})")
+            
+            return success
+            
+        except Exception as e:
+            print(f"Error saving averaged measurement: {e}")
+            return False
+    
     def get_color_measurements(self, coordinate_set_name: str) -> List[ColorMeasurement]:
         """Retrieve color measurements for a coordinate set.
         

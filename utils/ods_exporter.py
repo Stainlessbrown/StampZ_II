@@ -41,6 +41,9 @@ class ColorMeasurement:
     sample_anchor: str
     measurement_date: str
     notes: Optional[str] = None
+    is_averaged: bool = False
+    source_samples_count: Optional[int] = None
+    source_sample_ids: Optional[str] = None
 
 class ODSExporter:
     """Export StampZ color analysis data to ODS format."""
@@ -217,7 +220,10 @@ class ODSExporter:
                             sample_size=coord_details['size'],
                             sample_anchor=coord_details['anchor'],
                             measurement_date=measurement['measurement_date'],
-                            notes=measurement['notes']
+                            notes=measurement['notes'],
+                            is_averaged=measurement.get('is_averaged', False),
+                            source_samples_count=measurement.get('source_samples_count'),
+                            source_sample_ids=measurement.get('source_sample_ids')
                         ))
                     
                     sample_set_counter += 1
@@ -346,6 +352,15 @@ class ODSExporter:
     
     def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
         """Format measurement values based on normalization preference."""
+        
+        # Determine if this is an averaged measurement and format the Averages column accordingly
+        averages_info = ''
+        if measurement.is_averaged:
+            if measurement.source_samples_count:
+                averages_info = f"AVERAGE of {measurement.source_samples_count} samples"
+            else:
+                averages_info = "AVERAGE"
+        
         if use_normalized:
             return [
                 self._normalize_lab_l(measurement.l_value),
@@ -364,7 +379,7 @@ class ODSExporter:
                 measurement.measurement_date,
                 measurement.notes or '',
                 '',  # Calculations column
-                '',  # Averages column
+                averages_info,  # Averages column - show if this is an average
                 ''   # Analysis column
             ]
         else:
@@ -385,7 +400,7 @@ class ODSExporter:
                 measurement.measurement_date,
                 measurement.notes or '',
                 '',  # Calculations column
-                '',  # Averages column
+                averages_info,  # Averages column - show if this is an average
                 ''   # Analysis column
             ]
     
@@ -522,6 +537,14 @@ class ODSExporter:
             # Convert measurements to DataFrame
             data = []
             for measurement in measurements:
+                # Determine if this is an averaged measurement
+                averages_info = ''
+                if measurement.is_averaged:
+                    if measurement.source_samples_count:
+                        averages_info = f"AVERAGE of {measurement.source_samples_count} samples"
+                    else:
+                        averages_info = "AVERAGE"
+                
                 if use_normalized:
                     # Use normalized values
                     data.append({
@@ -541,7 +564,7 @@ class ODSExporter:
                         'Date': measurement.measurement_date,
                         'Notes': measurement.notes or '',
                         'Calculations': '',  # Empty column for user calculations
-                        'Averages': '',      # Empty column for user averages
+                        'Averages': averages_info,  # Show if this is an average
                         'Analysis': ''       # Empty column for user analysis
                     })
                 else:
@@ -563,7 +586,7 @@ class ODSExporter:
                         'Date': measurement.measurement_date,
                         'Notes': measurement.notes or '',
                         'Calculations': '',  # Empty column for user calculations
-                        'Averages': '',      # Empty column for user averages
+                        'Averages': averages_info,  # Show if this is an average
                         'Analysis': ''       # Empty column for user analysis
                     })
             
