@@ -283,6 +283,8 @@ class ODSExporter:
                             color_measurement.r_avg = avg_values.get('r_avg', '')
                             color_measurement.g_avg = avg_values.get('g_avg', '')
                             color_measurement.rgb_b_avg = avg_values.get('b_avg', '')  # This is the blue channel average
+                            # Create DataID for averaged data (filename_timestamp without sample suffix)
+                            color_measurement.avg_data_id = f"{image_basename}_{timestamp}"
                         else:
                             # Leave averaged values empty for subsequent samples of the same image
                             color_measurement.l_avg = ''
@@ -291,6 +293,7 @@ class ODSExporter:
                             color_measurement.r_avg = ''
                             color_measurement.g_avg = ''
                             color_measurement.rgb_b_avg = ''
+                            color_measurement.avg_data_id = ''
                         
                         measurements.append(color_measurement)
                     
@@ -412,13 +415,13 @@ class ODSExporter:
     def _get_export_headers(self, use_normalized: bool) -> List[str]:
         """Get column headers based on normalization preference."""
         if use_normalized:
-            return ["L*_norm", "a*_norm", "b*_norm", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
+            return ["L*_norm", "a*_norm", "b*_norm", "Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor", 
                    "R_norm", "G_norm", "B_norm", "DataID_2", "Date", "Notes", "Calculations", 
-                   "L*_avg_norm", "a*_avg_norm", "b*_avg_norm", "R_avg_norm", "G_avg_norm", "B_avg_norm", "Analysis"]
+                   "L*_avg_norm", "a*_avg_norm", "b*_avg_norm", "DataID", "R_avg_norm", "G_avg_norm", "B_avg_norm", "Analysis"]
         else:
-            return ["L*", "a*", "b*", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
+            return ["L*", "a*", "b*", "Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor", 
                    "R", "G", "B", "DataID_2", "Date", "Notes", "Calculations", 
-                   "L*_avg", "a*_avg", "b*_avg", "R_avg", "G_avg", "B_avg", "Analysis"]
+                   "L*_avg", "a*_avg", "b*_avg", "DataID", "R_avg", "G_avg", "B_avg", "Analysis"]
     
     def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
         """Format measurement values based on normalization preference."""
@@ -430,6 +433,7 @@ class ODSExporter:
         r_avg = getattr(measurement, 'r_avg', '')
         g_avg = getattr(measurement, 'g_avg', '')
         rgb_b_avg = getattr(measurement, 'rgb_b_avg', '')
+        avg_data_id = getattr(measurement, 'avg_data_id', '')
         
         if use_normalized:
             # Format averaged values with normalization if they exist
@@ -444,7 +448,7 @@ class ODSExporter:
                 self._normalize_lab_l(measurement.l_value),
                 self._normalize_lab_ab(measurement.a_value),
                 self._normalize_lab_ab(measurement.b_value),
-                measurement.data_id,
+                measurement.data_id,  # Filename_Timestamp (individual sample ID)
                 f"{measurement.x_position:.1f}",
                 f"{measurement.y_position:.1f}",
                 measurement.sample_shape,
@@ -460,6 +464,7 @@ class ODSExporter:
                 l_avg_norm,   # L*_avg_norm
                 a_avg_norm,   # a*_avg_norm
                 b_avg_norm,   # b*_avg_norm
+                avg_data_id,  # DataID (for averaged data - filename_timestamp without sample suffix)
                 r_avg_norm,   # R_avg_norm
                 g_avg_norm,   # G_avg_norm
                 rgb_b_avg_norm,  # B_avg_norm
@@ -478,7 +483,7 @@ class ODSExporter:
                 f"{measurement.l_value:.2f}",
                 f"{measurement.a_value:.2f}",
                 f"{measurement.b_value:.2f}",
-                measurement.data_id,
+                measurement.data_id,  # Filename_Timestamp (individual sample ID)
                 f"{measurement.x_position:.1f}",
                 f"{measurement.y_position:.1f}",
                 measurement.sample_shape,
@@ -494,6 +499,7 @@ class ODSExporter:
                 l_avg_str,    # L*_avg
                 a_avg_str,    # a*_avg
                 b_avg_str,    # b*_avg
+                avg_data_id,  # DataID (for averaged data - filename_timestamp without sample suffix)
                 r_avg_str,    # R_avg
                 g_avg_str,    # G_avg
                 rgb_b_avg_str,   # B_avg

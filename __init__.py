@@ -4,7 +4,7 @@ StampZ - Image Analysis and Color Analysis Tool
 Optimized for philatelic and precision image analysis
 """
 
-__version__ = '1.6.1'
+__version__ = "1.7.0"
 __app_name__ = 'StampZ'
 __description__ = 'Image analysis and color analysis tool optimized for philatelic images'
 
