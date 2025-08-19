@@ -515,6 +515,10 @@ class ColorComparisonManager(tk.Frame):
             avg_lab: Averaged Lab values
             enabled_samples: List of enabled sample points used for averaging
         """
+        print(f"DEBUG: _save_average_to_database called")
+        print(f"DEBUG: avg_rgb={avg_rgb}, avg_lab={avg_lab}")
+        print(f"DEBUG: enabled_samples count={len(enabled_samples)}")
+        
         try:
             if not enabled_samples:
                 messagebox.showerror("Error", "No samples enabled for averaging")
@@ -532,9 +536,16 @@ class ColorComparisonManager(tk.Frame):
                 return
             
             image_name = os.path.splitext(filename)[0]
+            print(f"DEBUG: Extracted image_name: '{image_name}'")
             
-            # Create sample set name for the compare data
-            sample_set_name = f"Compare_{image_name}"
+            # Find which database contains individual measurements for this image
+            sample_set_name = self._find_database_for_image(image_name)
+            if not sample_set_name:
+                # Fall back to Compare_* naming if no existing database found
+                sample_set_name = f"Compare_{image_name}"
+                print(f"DEBUG: No existing database found, using fallback: '{sample_set_name}'")
+            else:
+                print(f"DEBUG: Found existing database: '{sample_set_name}' for image '{image_name}'")
             
             # Convert enabled samples to the format expected by ColorAnalyzer
             sample_measurements = []
@@ -591,6 +602,55 @@ class ColorComparisonManager(tk.Frame):
                 "Error",
                 f"Failed to save averaged color data:\n\n{str(e)}"
             )
+    
+    def _find_database_for_image(self, image_name: str) -> str:
+        """Find which database contains individual measurements for the given image name.
+        
+        Args:
+            image_name: The image name to search for (e.g., 'F137-S35')
+            
+        Returns:
+            Sample set name (database name) that contains individual measurements for this image,
+            or None if not found
+        """
+        try:
+            import os
+            from utils.color_analysis_db import ColorAnalysisDB
+            
+            # Get all database files
+            db_dir = 'data/color_analysis'
+            if not os.path.exists(db_dir):
+                return None
+                
+            db_files = [f for f in os.listdir(db_dir) if f.endswith('.db')]
+            
+            # Check each database for individual measurements with this image name
+            for db_file in db_files:
+                try:
+                    sample_set_name = os.path.splitext(db_file)[0]
+                    db = ColorAnalysisDB(sample_set_name)
+                    all_measurements = db.get_all_measurements()
+                    
+                    # Look for individual measurements (not averaged) with this image name
+                    individual_measurements = [
+                        m for m in all_measurements 
+                        if not m.get('is_averaged', False) and m.get('image_name') == image_name
+                    ]
+                    
+                    if individual_measurements:
+                        print(f"DEBUG: Found {len(individual_measurements)} individual measurements for image '{image_name}' in database '{sample_set_name}'")
+                        return sample_set_name
+                        
+                except Exception as e:
+                    print(f"DEBUG: Error checking database {db_file}: {e}")
+                    continue
+            
+            print(f"DEBUG: No database found containing individual measurements for image '{image_name}'")
+            return None
+            
+        except Exception as e:
+            print(f"DEBUG: Error in _find_database_for_image: {e}")
+            return None
     
     def _refresh_library_manager(self, library_name: str):
         """Refresh the library manager display if it's open.

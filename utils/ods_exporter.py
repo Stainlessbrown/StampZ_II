@@ -145,12 +145,40 @@ class ODSExporter:
                     color_db = ColorAnalysisDB(sample_set_name)
                     
                     # Get all measurements for this sample set
-                    color_measurements = color_db.get_all_measurements()
+                    all_measurements = color_db.get_all_measurements()
                     
+                    # Separate individual measurements from averaged measurements
+                    individual_measurements = [m for m in all_measurements if not m.get('is_averaged', False)]
+                    averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
+                    
+                    print(f"DEBUG ODSExporter: Found {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
+                    
+                    # Calculate averaged values for this sample set (if any exist)
+                    averaged_values = {}
+                    if averaged_measurements:
+                        # Use the most recent averaged measurement for each image
+                        latest_averages = {}
+                        for avg_m in averaged_measurements:
+                            image_name = avg_m['image_name']
+                            if image_name not in latest_averages or avg_m['measurement_date'] > latest_averages[image_name]['measurement_date']:
+                                latest_averages[image_name] = avg_m
+                        
+                        # Store averaged values by image name
+                        for image_name, avg_m in latest_averages.items():
+                            averaged_values[image_name] = {
+                                'l_avg': avg_m['l_value'],
+                                'a_avg': avg_m['a_value'], 
+                                'b_avg': avg_m['b_value'],
+                                'r_avg': avg_m['rgb_r'],
+                                'g_avg': avg_m['rgb_g'],
+                                'b_avg': avg_m['rgb_b']
+                            }
+                    
+                    # Process individual measurements only
                     if deduplicate:
                         # Remove duplicates by keeping only the most recent measurement for each coordinate point
                         # Sort by measurement_date to ensure we get the latest one
-                        sorted_measurements = sorted(color_measurements, key=lambda x: x['measurement_date'])
+                        sorted_measurements = sorted(individual_measurements, key=lambda x: x['measurement_date'])
                         
                         unique_measurements = {}
                         for measurement in sorted_measurements:
@@ -160,13 +188,20 @@ class ODSExporter:
                         
                         measurements_to_process = unique_measurements.values()
                     else:
-                        # Return all measurements for accumulation
-                        measurements_to_process = color_measurements
+                        # Return all individual measurements for accumulation (no averaged rows)
+                        measurements_to_process = individual_measurements
                     
                     # Get coordinate template information for this sample set
                     coordinate_info = self._get_coordinate_info(sample_set_name)
                     
-                    # Convert to our ColorMeasurement objects
+                    # Track which images have already shown their averaged values
+                    images_with_averages_shown = set()
+                    
+                    # Sort measurements by image name and coordinate point to ensure consistent ordering
+                    measurements_to_process = sorted(measurements_to_process, 
+                                                    key=lambda x: (x['image_name'], x['coordinate_point']))
+                    
+                    # Convert to our ColorMeasurement objects and add averaged values
                     for measurement in measurements_to_process:
                         # Create data_id from image filename + timestamp + sample number
                         image_basename = os.path.splitext(os.path.basename(measurement['image_name']))[0]
@@ -190,21 +225,35 @@ class ODSExporter:
                         
                         # Try to get sample info from the measurement data itself
                         coord_details = {
-                            'shape': measurement.get('sample_type', 'unknown'),
-                            'size': measurement.get('sample_size', 'unknown'),
-                            'anchor': measurement.get('sample_anchor', 'unknown')
+                            'shape': measurement.get('sample_type', 'circle'),  # Default to circle if None
+                            'size': measurement.get('sample_size', '20'),      # Default size if None
+                            'anchor': measurement.get('sample_anchor', 'center') # Default anchor if None
                         }
                         
-                        # If we don't have sample info in the measurement, fall back to coordinate template
-                        if coord_details['shape'] == 'unknown' or not coord_details['shape']:
+                        # If we still don't have sample info, fall back to coordinate template
+                        if coord_details['shape'] in ['unknown', None, ''] or not coord_details['shape']:
                             template_details = coordinate_info.get(coord_point, {})
-                            coord_details = {
-                                'shape': template_details.get('shape', 'unknown'),
-                                'size': template_details.get('size', 'unknown'),
-                                'anchor': template_details.get('anchor', 'unknown')
-                            }
+                            if template_details:
+                                coord_details = {
+                                    'shape': template_details.get('shape', 'circle'),
+                                    'size': template_details.get('size', '20'),
+                                    'anchor': template_details.get('anchor', 'center')
+                                }
                         
-                        measurements.append(ColorMeasurement(
+                        # Get the averaged values for this image (if they exist)
+                        image_name = measurement['image_name']
+                        avg_values = averaged_values.get(image_name, {})
+                        
+                        # Only show averaged values on the first sample (coordinate_point 1) for each image
+                        show_averages = (image_name not in images_with_averages_shown and 
+                                       measurement['coordinate_point'] == 1 and 
+                                       avg_values)
+                        
+                        if show_averages:
+                            images_with_averages_shown.add(image_name)
+                        
+                        # Create ColorMeasurement with averaged values stored as additional attributes
+                        color_measurement = ColorMeasurement(
                             data_id=data_id,
                             sample_set_number=sample_set_counter,
                             coordinate_point=measurement['coordinate_point'],
@@ -224,7 +273,26 @@ class ODSExporter:
                             is_averaged=measurement.get('is_averaged', False),
                             source_samples_count=measurement.get('source_samples_count'),
                             source_sample_ids=measurement.get('source_sample_ids')
-                        ))
+                        )
+                        
+                        # Add averaged values as attributes for export formatting (only on first sample for each image)
+                        if show_averages:
+                            color_measurement.l_avg = avg_values.get('l_avg', '')
+                            color_measurement.a_avg = avg_values.get('a_avg', '')
+                            color_measurement.b_avg = avg_values.get('b_avg', '')
+                            color_measurement.r_avg = avg_values.get('r_avg', '')
+                            color_measurement.g_avg = avg_values.get('g_avg', '')
+                            color_measurement.rgb_b_avg = avg_values.get('b_avg', '')  # This is the blue channel average
+                        else:
+                            # Leave averaged values empty for subsequent samples of the same image
+                            color_measurement.l_avg = ''
+                            color_measurement.a_avg = ''
+                            color_measurement.b_avg = ''
+                            color_measurement.r_avg = ''
+                            color_measurement.g_avg = ''
+                            color_measurement.rgb_b_avg = ''
+                        
+                        measurements.append(color_measurement)
                     
                     sample_set_counter += 1
                     
@@ -345,23 +413,33 @@ class ODSExporter:
         """Get column headers based on normalization preference."""
         if use_normalized:
             return ["L*_norm", "a*_norm", "b*_norm", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
-                   "R_norm", "G_norm", "B_norm", "DataID_2", "Date", "Notes", "Calculations", "Averages", "Analysis"]
+                   "R_norm", "G_norm", "B_norm", "DataID_2", "Date", "Notes", "Calculations", 
+                   "L*_avg_norm", "a*_avg_norm", "b*_avg_norm", "R_avg_norm", "G_avg_norm", "B_avg_norm", "Analysis"]
         else:
             return ["L*", "a*", "b*", "DataID", "X", "Y", "Shape", "Size", "Anchor", 
-                   "R", "G", "B", "DataID_2", "Date", "Notes", "Calculations", "Averages", "Analysis"]
+                   "R", "G", "B", "DataID_2", "Date", "Notes", "Calculations", 
+                   "L*_avg", "a*_avg", "b*_avg", "R_avg", "G_avg", "B_avg", "Analysis"]
     
     def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
         """Format measurement values based on normalization preference."""
         
-        # Determine if this is an averaged measurement and format the Averages column accordingly
-        averages_info = ''
-        if measurement.is_averaged:
-            if measurement.source_samples_count:
-                averages_info = f"AVERAGE of {measurement.source_samples_count} samples"
-            else:
-                averages_info = "AVERAGE"
+        # Get averaged values if they exist (stored as attributes)
+        l_avg = getattr(measurement, 'l_avg', '')
+        a_avg = getattr(measurement, 'a_avg', '')
+        b_avg = getattr(measurement, 'b_avg', '')
+        r_avg = getattr(measurement, 'r_avg', '')
+        g_avg = getattr(measurement, 'g_avg', '')
+        rgb_b_avg = getattr(measurement, 'rgb_b_avg', '')
         
         if use_normalized:
+            # Format averaged values with normalization if they exist
+            l_avg_norm = self._normalize_lab_l(l_avg) if l_avg != '' else ''
+            a_avg_norm = self._normalize_lab_ab(a_avg) if a_avg != '' else ''
+            b_avg_norm = self._normalize_lab_ab(b_avg) if b_avg != '' else ''
+            r_avg_norm = self._normalize_rgb(r_avg) if r_avg != '' else ''
+            g_avg_norm = self._normalize_rgb(g_avg) if g_avg != '' else ''
+            rgb_b_avg_norm = self._normalize_rgb(rgb_b_avg) if rgb_b_avg != '' else ''
+            
             return [
                 self._normalize_lab_l(measurement.l_value),
                 self._normalize_lab_ab(measurement.a_value),
@@ -379,10 +457,23 @@ class ODSExporter:
                 measurement.measurement_date,
                 measurement.notes or '',
                 '',  # Calculations column
-                averages_info,  # Averages column - show if this is an average
+                l_avg_norm,   # L*_avg_norm
+                a_avg_norm,   # a*_avg_norm
+                b_avg_norm,   # b*_avg_norm
+                r_avg_norm,   # R_avg_norm
+                g_avg_norm,   # G_avg_norm
+                rgb_b_avg_norm,  # B_avg_norm
                 ''   # Analysis column
             ]
         else:
+            # Format averaged values without normalization if they exist
+            l_avg_str = f"{l_avg:.2f}" if l_avg != '' else ''
+            a_avg_str = f"{a_avg:.2f}" if a_avg != '' else ''
+            b_avg_str = f"{b_avg:.2f}" if b_avg != '' else ''
+            r_avg_str = f"{r_avg:.2f}" if r_avg != '' else ''
+            g_avg_str = f"{g_avg:.2f}" if g_avg != '' else ''
+            rgb_b_avg_str = f"{rgb_b_avg:.2f}" if rgb_b_avg != '' else ''
+            
             return [
                 f"{measurement.l_value:.2f}",
                 f"{measurement.a_value:.2f}",
@@ -400,7 +491,12 @@ class ODSExporter:
                 measurement.measurement_date,
                 measurement.notes or '',
                 '',  # Calculations column
-                averages_info,  # Averages column - show if this is an average
+                l_avg_str,    # L*_avg
+                a_avg_str,    # a*_avg
+                b_avg_str,    # b*_avg
+                r_avg_str,    # R_avg
+                g_avg_str,    # G_avg
+                rgb_b_avg_str,   # B_avg
                 ''   # Analysis column
             ]
     

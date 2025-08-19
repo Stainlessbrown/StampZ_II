@@ -278,6 +278,12 @@ class ColorAnalysisDB:
         Returns:
             True if save was successful
         """
+        print(f"DEBUG DB: save_averaged_measurement called")
+        print(f"DEBUG DB: set_id={set_id}, image_name={image_name}")
+        print(f"DEBUG DB: averaged_lab={averaged_lab}, averaged_rgb={averaged_rgb}")
+        print(f"DEBUG DB: source_measurements count={len(source_measurements)}")
+        print(f"DEBUG DB: notes={notes}")
+        
         try:
             with sqlite3.connect(self.db_path) as conn:
                 # Calculate average position from source measurements

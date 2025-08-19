@@ -769,6 +769,11 @@ class ColorAnalyzer:
         Returns:
             True if save was successful
         """
+        print(f"DEBUG: save_averaged_measurement_from_samples called")
+        print(f"DEBUG: sample_set_name={sample_set_name}, image_name={image_name}")
+        print(f"DEBUG: notes={notes}")
+        print(f"DEBUG: sample_measurements count={len(sample_measurements)}")
+        
         try:
             if not sample_measurements:
                 print("No sample measurements provided for averaging")

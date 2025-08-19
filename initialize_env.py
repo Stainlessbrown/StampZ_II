@@ -291,10 +291,12 @@ else:
         logger.info(f"Installed Python mode - User data directory: {user_data_dir}")
 
 # *** DATA PRESERVATION SYSTEM ***
-# Check for existing user data and create backups or restore as needed
-logger.info("=== Starting Data Preservation Check ===")
-check_and_preserve_data(user_data_dir)
-logger.info("=== Data Preservation Check Complete ===")
+# Backup system is available but disabled for normal operation
+# Uncomment the lines below if backup/restore functionality is needed during development
+# logger.info("=== Starting Data Preservation Check ===")
+# check_and_preserve_data(user_data_dir)
+# logger.info("=== Data Preservation Check Complete ===")
+logger.info("Data preservation system available but not running automatically")
 
 # Add our app directories to Python path
 for dir_name in ['gui', 'utils']:
