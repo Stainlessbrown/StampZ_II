@@ -3,6 +3,18 @@ import sys
 import os
 from PyInstaller.utils.hooks import collect_all
 
+# Get version dynamically from __init__.py
+try:
+    with open('__init__.py', 'r') as f:
+        for line in f:
+            if line.startswith('__version__'):
+                VERSION = line.split('=')[1].strip().strip('"').strip("'")
+                break
+    else:
+        VERSION = '1.7.1'  # Fallback version
+except Exception:
+    VERSION = '1.7.1'  # Fallback version
+
 # Safely collect odfpy data files and imports
 try:
     datas, binaries, hiddenimports = collect_all('odfpy')
@@ -153,5 +165,5 @@ else:
             name='StampZ.app',
             icon=icon_path,
             bundle_identifier='com.stainlessbrown.stampz',
-            version='1.53',
+            version=VERSION,
         )
