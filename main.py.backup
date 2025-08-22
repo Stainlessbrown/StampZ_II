@@ -492,10 +492,9 @@ class StampZApp:
 
                 if replace_response:
                     try:
-                        new_image, new_metadata = load_image(filepath)
+                        new_image = load_image(filepath)
                         self.canvas.load_image(new_image)
                         self.current_file = filepath
-                        self.current_image_metadata = new_metadata
                         base_filename = os.path.basename(filepath)
                         self.root.title(f"StampZ - {base_filename}")
                         self.control_panel.update_current_filename(filepath)

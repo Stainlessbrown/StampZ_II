@@ -114,6 +114,9 @@ class PreferencesDialog:
         # File dialog preferences tab
         self._create_file_dialog_tab(notebook)
         
+        # Interface preferences tab
+        self._create_interface_tab(notebook)
+        
         # Future tabs can be added here
         # self._create_general_tab(notebook)
         # self._create_appearance_tab(notebook)
@@ -411,6 +414,99 @@ class PreferencesDialog:
             font=("TkDefaultFont", 9)
         ).pack(anchor=tk.W)
     
+    def _create_interface_tab(self, notebook):
+        """Create the interface preferences tab."""
+        interface_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(interface_frame, text="Interface")
+        
+        # Interface mode section
+        mode_frame = ttk.LabelFrame(interface_frame, text="Interface Complexity Level", padding="10")
+        mode_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(
+            mode_frame, 
+            text="Choose the level of interface complexity that best suits your needs:",
+            font=("TkDefaultFont", 10, "bold")
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        self.interface_mode_var = tk.StringVar()
+        
+        # Basic mode
+        basic_frame = ttk.Frame(mode_frame)
+        basic_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Radiobutton(
+            basic_frame,
+            text="Basic Mode",
+            variable=self.interface_mode_var,
+            value="basic"
+        ).pack(anchor=tk.W)
+        
+        ttk.Label(
+            basic_frame,
+            text="• One-click scanning recommendations\n• Simplified controls and guided workflows\n• Circular sampling (recommended for most cases)\n• Basic color difference reports",
+            font=("TkDefaultFont", 10),
+            foreground="#444444",
+            justify=tk.LEFT
+        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
+        
+        # Detailed Analysis mode
+        detailed_frame = ttk.Frame(mode_frame)
+        detailed_frame.pack(fill=tk.X, pady=(5, 5))
+        
+        ttk.Radiobutton(
+            detailed_frame,
+            text="Detailed Analysis Mode",
+            variable=self.interface_mode_var,
+            value="detailed"
+        ).pack(anchor=tk.W)
+        
+        ttk.Label(
+            detailed_frame,
+            text="• More analysis options and controls\n• Additional color space conversions\n• Enhanced statistical reporting\n• Sampling method selection",
+            font=("TkDefaultFont", 10),
+            foreground="#444444",
+            justify=tk.LEFT
+        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
+        
+        # Expert mode
+        expert_frame = ttk.Frame(mode_frame)
+        expert_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        ttk.Radiobutton(
+            expert_frame,
+            text="Expert Mode",
+            variable=self.interface_mode_var,
+            value="expert"
+        ).pack(anchor=tk.W)
+        
+        ttk.Label(
+            expert_frame,
+            text="• All advanced controls and options\n• Complete sampling algorithm details\n• Advanced calibration settings\n• Full statistical methods access",
+            font=("TkDefaultFont", 10),
+            foreground="#444444",
+            justify=tk.LEFT
+        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
+        
+        # Mode change info
+        info_frame = ttk.LabelFrame(interface_frame, text="Information", padding="10")
+        info_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        info_text = (
+            "• Interface mode changes take effect immediately after applying preferences\n"
+            "• You can switch between modes at any time\n"
+            "• Basic mode is recommended for new users and quick analysis tasks\n"
+            "• Expert mode provides access to all advanced features for specialized workflows"
+        )
+        
+        ttk.Label(
+            info_frame,
+            text=info_text,
+            wraplength=550,
+            justify=tk.LEFT,
+            font=("TkDefaultFont", 9)
+        ).pack(anchor=tk.W)
+    
     def _clear_remembered_directories(self):
         """Clear the remembered directories."""
         result = messagebox.askyesno(
@@ -515,6 +611,10 @@ class PreferencesDialog:
         # Color library preferences
         self._load_color_library_preferences()
         
+        # Interface mode preference
+        interface_mode = self.prefs_manager.get_interface_mode()
+        self.interface_mode_var.set(interface_mode)
+        
         # Update preview
         self._update_filename_preview()
     
@@ -616,6 +716,11 @@ class PreferencesDialog:
                 if display_name in self._library_mapping:
                     library_name = self._library_mapping[display_name]
                     self.prefs_manager.set_default_color_library(library_name)
+            
+            # Interface mode preference
+            interface_mode = self.interface_mode_var.get()
+            if interface_mode:
+                self.prefs_manager.set_interface_mode(interface_mode)
             
             # Save preferences
             success = self.prefs_manager.save_preferences()

@@ -1,6 +1,6 @@
 {
   "export_prefs": {
-    "ods_export_directory": "",
+    "ods_export_directory": "/Users/stanbrown/Desktop/StampZ Exports",
     "auto_open_after_export": true,
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
@@ -14,5 +14,8 @@
   },
   "color_library_prefs": {
     "default_library": "basic_colors"
+  },
+  "interface_prefs": {
+    "interface_mode": "basic"
   }
 }

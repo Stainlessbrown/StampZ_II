@@ -34,6 +34,12 @@ class FileDialogPreferences:
 class ColorLibraryPreferences:
     """Preferences for color library system."""
     default_library: str = "basic_colors"  # Default color library to use
+
+
+@dataclass
+class InterfacePreferences:
+    """Preferences for user interface behavior."""
+    interface_mode: str = "basic"  # Interface mode: "basic", "detailed", or "expert"
     
     
 @dataclass 
@@ -42,11 +48,13 @@ class UserPreferences:
     export_prefs: ExportPreferences
     file_dialog_prefs: FileDialogPreferences
     color_library_prefs: ColorLibraryPreferences
+    interface_prefs: InterfacePreferences
     
     def __init__(self):
         self.export_prefs = ExportPreferences()
         self.file_dialog_prefs = FileDialogPreferences()
         self.color_library_prefs = ColorLibraryPreferences()
+        self.interface_prefs = InterfacePreferences()
 
 
 class PreferencesManager:
@@ -261,6 +269,40 @@ class PreferencesManager:
             print(f"Error getting available color libraries: {e}")
             return ["basic_colors"]
     
+    def get_interface_mode(self) -> str:
+        """Get the current interface mode."""
+        return self.preferences.interface_prefs.interface_mode
+    
+    def set_interface_mode(self, mode: str) -> bool:
+        """Set the interface mode.
+        
+        Args:
+            mode: Interface mode ('basic', 'detailed', or 'expert')
+        """
+        if mode not in ['basic', 'detailed', 'expert']:
+            print(f"Error: Invalid interface mode '{mode}'. Use 'basic', 'detailed', or 'expert'.")
+            return False
+        
+        try:
+            self.preferences.interface_prefs.interface_mode = mode
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting interface mode: {e}")
+            return False
+    
+    def is_basic_mode(self) -> bool:
+        """Check if interface is in basic mode."""
+        return self.get_interface_mode() == "basic"
+    
+    def is_detailed_mode(self) -> bool:
+        """Check if interface is in detailed analysis mode."""
+        return self.get_interface_mode() == "detailed"
+    
+    def is_expert_mode(self) -> bool:
+        """Check if interface is in expert mode."""
+        return self.get_interface_mode() == "expert"
+    
     def get_export_filename(self, sample_set_name: str = None, extension: str = ".ods") -> str:
         """Generate export filename based on preferences."""
         from datetime import datetime
@@ -325,6 +367,13 @@ class PreferencesManager:
                         default_library=library_data.get('default_library', 'basic_colors')
                     )
                 
+                # Load interface preferences
+                if 'interface_prefs' in data:
+                    interface_data = data['interface_prefs']
+                    self.preferences.interface_prefs = InterfacePreferences(
+                        interface_mode=interface_data.get('interface_mode', 'basic')
+                    )
+                
                 print(f"Loaded preferences from {self.prefs_file}")
                 return True
         except Exception as e:
@@ -354,7 +403,8 @@ class PreferencesManager:
             existing_data.update({
                 'export_prefs': asdict(self.preferences.export_prefs),
                 'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs),
-                'color_library_prefs': asdict(self.preferences.color_library_prefs)
+                'color_library_prefs': asdict(self.preferences.color_library_prefs),
+                'interface_prefs': asdict(self.preferences.interface_prefs)
             })
             
             with open(self.prefs_file, 'w') as f:
@@ -401,3 +451,23 @@ def get_export_directory() -> str:
 def set_export_directory(directory: str) -> bool:
     """Convenience function to set export directory."""
     return get_preferences_manager().set_export_directory(directory)
+
+
+def get_interface_mode() -> str:
+    """Convenience function to get current interface mode."""
+    return get_preferences_manager().get_interface_mode()
+
+
+def is_basic_mode() -> bool:
+    """Convenience function to check if interface is in basic mode."""
+    return get_preferences_manager().is_basic_mode()
+
+
+def is_detailed_mode() -> bool:
+    """Convenience function to check if interface is in detailed analysis mode."""
+    return get_preferences_manager().is_detailed_mode()
+
+
+def is_expert_mode() -> bool:
+    """Convenience function to check if interface is in expert mode."""
+    return get_preferences_manager().is_expert_mode()
