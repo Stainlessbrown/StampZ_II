@@ -695,7 +695,7 @@ class ReorganizedControlPanel(ttk.Frame):
         # Get the application's data directory from environment
         stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
         if not stampz_data_dir:
-            stampz_data_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'StampZ')
+            stampz_data_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'StampZ_II')
         recent_dir = os.path.join(stampz_data_dir, 'recent')
         
         # Create dialog
@@ -762,13 +762,14 @@ class ReorganizedControlPanel(ttk.Frame):
             if os.path.exists(file_path):
                 try:
                     # Load the image directly from Recent folder
-                    image = load_image(file_path)
+                    image, metadata = load_image(file_path)
                     dialog.destroy()
                     self.main_app.canvas.load_image(image)
                     self.main_app.current_file = file_path
+                    self.main_app.current_image_metadata = metadata  # Store metadata for later use
                     self.main_app.control_panel.enable_controls(True)
                     base_filename = os.path.basename(file_path)
-                    self.main_app.root.title(f"StampZ - {base_filename}")
+                    self.main_app.root.title(f"StampZ_II - {base_filename}")
                     self.main_app.control_panel.update_current_filename(file_path)
                 except ImageLoadError as e:
                     messagebox.showerror("Error", str(e))
