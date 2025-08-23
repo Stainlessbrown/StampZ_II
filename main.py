@@ -1915,19 +1915,25 @@ class StampZApp:
             # Use persistent user data directory for color libraries
             import sys
             
-            if hasattr(sys, '_MEIPASS'):
-                # Running in PyInstaller bundle - use user data directory
-                if sys.platform.startswith('linux'):
-                    user_data_dir = os.path.expanduser('~/.local/share/StampZ')
-                elif sys.platform == 'darwin':
-                    user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+            # Use centralized path logic instead of hardcoded paths
+            try:
+                from utils.path_utils import get_color_libraries_dir
+                library_dir = get_color_libraries_dir()
+            except ImportError:
+                # Fallback if path_utils not available
+                if hasattr(sys, '_MEIPASS'):
+                    # Running in PyInstaller bundle - use user data directory
+                    if sys.platform.startswith('linux'):
+                        user_data_dir = os.path.expanduser('~/.local/share/StampZ_II')
+                    elif sys.platform == 'darwin':
+                        user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ_II')
+                    else:
+                        user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ_II')
+                    library_dir = os.path.join(user_data_dir, "data", "color_libraries")
                 else:
-                    user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
-                library_dir = os.path.join(user_data_dir, "data", "color_libraries")
-            else:
-                # Running from source - use relative path
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                library_dir = os.path.join(current_dir, "data", "color_libraries")
+                    # Running from source - use relative path
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    library_dir = os.path.join(current_dir, "data", "color_libraries")
             
             # Ensure directory exists
             os.makedirs(library_dir, exist_ok=True)
