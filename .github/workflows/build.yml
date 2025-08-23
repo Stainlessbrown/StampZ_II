@@ -127,7 +127,7 @@ jobs:
         # Linux: Use PyInstaller spec file for comprehensive PIL/tkinter support
         python -m PyInstaller stampz.spec
         # Rename the output to match expected name
-        mv dist/StampZ dist/StampZ_II_${{ matrix.name }}
+        mv dist/StampZ_II dist/StampZ_II_${{ matrix.name }}
         echo "Linux build completed. Checking dist directory:"
         ls -la dist/
         
