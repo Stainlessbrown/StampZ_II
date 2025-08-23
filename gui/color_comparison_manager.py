@@ -634,7 +634,7 @@ class ColorComparisonManager(tk.Frame):
             # Try multiple possible database directories
             possible_dirs = [
                 'data/color_analysis',  # Development relative path
-                os.path.join(os.path.expanduser('~/Library/Application Support/StampZ'), 'data', 'color_analysis'),  # macOS app support
+                os.path.join(os.path.expanduser('~/Library/Application Support/StampZ_II'), 'data', 'color_analysis'),  # macOS app support
                 os.path.join(os.getenv('STAMPZ_DATA_DIR', ''), 'data', 'color_analysis') if os.getenv('STAMPZ_DATA_DIR') else None
             ]
             
