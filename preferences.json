@@ -1,6 +1,6 @@
 {
   "export_prefs": {
-    "ods_export_directory": "/Users/stanbrown/Desktop/StampZ Exports",
+    "ods_export_directory": "/Users/stanbrown/Desktop/Color Analysis spreadsheets",
     "auto_open_after_export": true,
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
@@ -9,11 +9,11 @@
   },
   "file_dialog_prefs": {
     "last_open_directory": "/Users/stanbrown/Desktop/Semeuse comparisons scans",
-    "last_save_directory": "/Users/stanbrown/Desktop/F137-S23-crp.tif",
+    "last_save_directory": "/Users/stanbrown/Desktop/Test137-crp.tif",
     "remember_directories": true
   },
   "color_library_prefs": {
-    "default_library": "basic_colors"
+    "default_library": "sg_1"
   },
   "interface_prefs": {
     "interface_mode": "basic"
