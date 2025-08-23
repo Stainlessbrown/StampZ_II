@@ -613,19 +613,19 @@ class PreferencesDialog:
         summary_text = f"The following data from your old StampZ installation can be migrated:\n\n"
         
         if summary['color_libraries']:
-            summary_text += f"📚 Color Libraries ({len(summary['color_libraries'])}):")
+            summary_text += f"📚 Color Libraries ({len(summary['color_libraries'])}):"
             for lib in summary['color_libraries']:
                 summary_text += f"\n  • {lib['name']} ({lib['size_mb']} MB)"
             summary_text += "\n\n"
         
         if summary['color_analysis']:
-            summary_text += f"🔬 Color Analysis ({len(summary['color_analysis'])}):")
+            summary_text += f"🔬 Color Analysis ({len(summary['color_analysis'])}):"
             for analysis in summary['color_analysis']:
                 summary_text += f"\n  • {analysis['name']} ({analysis['size_mb']} MB)"
             summary_text += "\n\n"
         
         if summary['coordinates']:
-            summary_text += f"📍 Coordinate Templates ({len(summary['coordinates'])}):")
+            summary_text += f"📍 Coordinate Templates ({len(summary['coordinates'])}):"
             for coord in summary['coordinates']:
                 summary_text += f"\n  • {coord['path']} ({coord['size_mb']} MB)"
             summary_text += "\n\n"

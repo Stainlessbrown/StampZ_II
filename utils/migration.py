@@ -33,14 +33,22 @@ class StampZMigration:
         return None
     
     def _get_new_stampz_dir(self) -> Optional[Path]:
-        """Get the new StampZ_II directory path."""
-        if sys.platform == 'darwin':
-            return Path.home() / 'Library' / 'Application Support' / 'StampZ_II'
-        elif sys.platform.startswith('linux'):
-            return Path.home() / '.local' / 'share' / 'StampZ_II'
-        elif sys.platform.startswith('win'):
-            return Path.home() / 'AppData' / 'Roaming' / 'StampZ_II'
-        return None
+        """Get the new StampZ_II directory path using same logic as main app."""
+        try:
+            # Import here to avoid circular imports
+            from utils.path_utils import get_base_data_dir
+            # Get the base data directory and go up one level to get the main StampZ_II dir
+            base_data_dir = Path(get_base_data_dir())
+            return base_data_dir.parent
+        except ImportError:
+            # Fallback to original logic if path_utils not available
+            if sys.platform == 'darwin':
+                return Path.home() / 'Library' / 'Application Support' / 'StampZ_II'
+            elif sys.platform.startswith('linux'):
+                return Path.home() / '.local' / 'share' / 'StampZ_II'
+            elif sys.platform.startswith('win'):
+                return Path.home() / 'AppData' / 'Roaming' / 'StampZ_II'
+            return None
     
     def is_migration_needed(self) -> bool:
         """Check if migration is needed (old directory exists but migration hasn't been done)."""
