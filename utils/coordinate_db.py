@@ -52,11 +52,11 @@ class CoordinateDB:
         import sys
         if hasattr(sys, '_MEIPASS'):
             if sys.platform.startswith('linux'):
-                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
+                user_data_dir = os.path.expanduser('~/.local/share/StampZ_II')
             elif sys.platform == 'darwin':
-                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ_II')
             else:
-                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
+                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ_II')
             self.db_path = os.path.join(user_data_dir, "coordinates.db")
             print(f"DEBUG: Using persistent database path: {self.db_path}")
         else:

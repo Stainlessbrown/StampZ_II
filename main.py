@@ -533,7 +533,7 @@ class StampZApp:
             from __init__ import __version__, __app_name__, __description__
         except ImportError:
             __version__ = "Unknown"
-            __app_name__ = "StampZ"
+            __app_name__ = "StampZ_II"
             __description__ = "Image analysis and color analysis tool"
         
         messagebox.showinfo(
@@ -601,7 +601,7 @@ class StampZApp:
             self._clear_samples(skip_confirmation=True, reset_all=True)  # Use existing method to clear samples
             
             # Reset window title
-            self.root.title("StampZ")
+            self.root.title("StampZ_II")
             
             # Reset control panel state
             if hasattr(self.control_panel, 'sample_set_name'):
