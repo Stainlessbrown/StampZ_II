@@ -37,6 +37,15 @@ class ColorLibraryPreferences:
 
 
 @dataclass
+class SampleAreaPreferences:
+    """Preferences for default sample area settings."""
+    default_shape: str = "circle"  # Default shape: "circle" or "rectangle"
+    default_width: int = 10  # Default width/diameter in pixels
+    default_height: int = 10  # Default height in pixels (same as width for circles)
+    default_anchor: str = "center"  # Default anchor position
+
+
+@dataclass
 class InterfacePreferences:
     """Preferences for user interface behavior."""
     interface_mode: str = "basic"  # Interface mode: "basic", "detailed", or "expert"
@@ -48,12 +57,14 @@ class UserPreferences:
     export_prefs: ExportPreferences
     file_dialog_prefs: FileDialogPreferences
     color_library_prefs: ColorLibraryPreferences
+    sample_area_prefs: SampleAreaPreferences
     interface_prefs: InterfacePreferences
     
     def __init__(self):
         self.export_prefs = ExportPreferences()
         self.file_dialog_prefs = FileDialogPreferences()
         self.color_library_prefs = ColorLibraryPreferences()
+        self.sample_area_prefs = SampleAreaPreferences()
         self.interface_prefs = InterfacePreferences()
 
 
@@ -303,6 +314,104 @@ class PreferencesManager:
         """Check if interface is in expert mode."""
         return self.get_interface_mode() == "expert"
     
+    def get_default_sample_shape(self) -> str:
+        """Get the default sample area shape."""
+        return self.preferences.sample_area_prefs.default_shape
+    
+    def set_default_sample_shape(self, shape: str) -> bool:
+        """Set the default sample area shape.
+        
+        Args:
+            shape: Shape type ('circle' or 'rectangle')
+        """
+        if shape not in ['circle', 'rectangle']:
+            print(f"Error: Invalid shape '{shape}'. Use 'circle' or 'rectangle'.")
+            return False
+        
+        try:
+            self.preferences.sample_area_prefs.default_shape = shape
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting default sample shape: {e}")
+            return False
+    
+    def get_default_sample_width(self) -> int:
+        """Get the default sample area width/diameter."""
+        return self.preferences.sample_area_prefs.default_width
+    
+    def set_default_sample_width(self, width: int) -> bool:
+        """Set the default sample area width/diameter.
+        
+        Args:
+            width: Width in pixels (must be positive)
+        """
+        if width <= 0:
+            print(f"Error: Width must be positive, got {width}")
+            return False
+        
+        try:
+            self.preferences.sample_area_prefs.default_width = width
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting default sample width: {e}")
+            return False
+    
+    def get_default_sample_height(self) -> int:
+        """Get the default sample area height."""
+        return self.preferences.sample_area_prefs.default_height
+    
+    def set_default_sample_height(self, height: int) -> bool:
+        """Set the default sample area height.
+        
+        Args:
+            height: Height in pixels (must be positive)
+        """
+        if height <= 0:
+            print(f"Error: Height must be positive, got {height}")
+            return False
+        
+        try:
+            self.preferences.sample_area_prefs.default_height = height
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting default sample height: {e}")
+            return False
+    
+    def get_default_sample_anchor(self) -> str:
+        """Get the default sample area anchor position."""
+        return self.preferences.sample_area_prefs.default_anchor
+    
+    def set_default_sample_anchor(self, anchor: str) -> bool:
+        """Set the default sample area anchor position.
+        
+        Args:
+            anchor: Anchor position ('center', 'top_left', 'top_right', 'bottom_left', 'bottom_right')
+        """
+        valid_anchors = ['center', 'top_left', 'top_right', 'bottom_left', 'bottom_right']
+        if anchor not in valid_anchors:
+            print(f"Error: Invalid anchor '{anchor}'. Use one of: {', '.join(valid_anchors)}")
+            return False
+        
+        try:
+            self.preferences.sample_area_prefs.default_anchor = anchor
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting default sample anchor: {e}")
+            return False
+    
+    def get_default_sample_settings(self) -> dict:
+        """Get all default sample area settings as a dictionary."""
+        return {
+            'shape': self.preferences.sample_area_prefs.default_shape,
+            'width': self.preferences.sample_area_prefs.default_width,
+            'height': self.preferences.sample_area_prefs.default_height,
+            'anchor': self.preferences.sample_area_prefs.default_anchor
+        }
+    
     def get_export_filename(self, sample_set_name: str = None, extension: str = ".ods") -> str:
         """Generate export filename based on preferences."""
         from datetime import datetime
@@ -367,6 +476,16 @@ class PreferencesManager:
                         default_library=library_data.get('default_library', 'basic_colors')
                     )
                 
+                # Load sample area preferences
+                if 'sample_area_prefs' in data:
+                    sample_data = data['sample_area_prefs']
+                    self.preferences.sample_area_prefs = SampleAreaPreferences(
+                        default_shape=sample_data.get('default_shape', 'circle'),
+                        default_width=sample_data.get('default_width', 10),
+                        default_height=sample_data.get('default_height', 10),
+                        default_anchor=sample_data.get('default_anchor', 'center')
+                    )
+                
                 # Load interface preferences
                 if 'interface_prefs' in data:
                     interface_data = data['interface_prefs']
@@ -404,6 +523,7 @@ class PreferencesManager:
                 'export_prefs': asdict(self.preferences.export_prefs),
                 'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs),
                 'color_library_prefs': asdict(self.preferences.color_library_prefs),
+                'sample_area_prefs': asdict(self.preferences.sample_area_prefs),
                 'interface_prefs': asdict(self.preferences.interface_prefs)
             })
             

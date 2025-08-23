@@ -491,6 +491,101 @@ class PreferencesDialog:
             justify=tk.LEFT
         ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
         
+        # Sample area defaults section
+        sample_frame = ttk.LabelFrame(interface_frame, text="Sample Area Defaults", padding="10")
+        sample_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        ttk.Label(
+            sample_frame, 
+            text="Set default shape, size, and anchor for new sample areas:",
+            font=("TkDefaultFont", 10, "bold")
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Sample controls layout
+        sample_controls_frame = ttk.Frame(sample_frame)
+        sample_controls_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Shape selection
+        shape_frame = ttk.Frame(sample_controls_frame)
+        shape_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(shape_frame, text="Shape:", width=10).pack(side=tk.LEFT)
+        self.sample_shape_var = tk.StringVar()
+        shape_combo = ttk.Combobox(
+            shape_frame,
+            textvariable=self.sample_shape_var,
+            values=['circle', 'rectangle'],
+            state='readonly',
+            width=15
+        )
+        shape_combo.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Size selection
+        size_frame = ttk.Frame(sample_controls_frame)
+        size_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(size_frame, text="Size:", width=10).pack(side=tk.LEFT)
+        
+        # Width
+        width_frame = ttk.Frame(size_frame)
+        width_frame.pack(side=tk.LEFT, padx=(5, 0))
+        
+        ttk.Label(width_frame, text="W:").pack(side=tk.LEFT)
+        self.sample_width_var = tk.StringVar()
+        width_spin = ttk.Spinbox(
+            width_frame,
+            textvariable=self.sample_width_var,
+            from_=1, to=100,
+            width=6
+        )
+        width_spin.pack(side=tk.LEFT, padx=(2, 0))
+        
+        # Height
+        height_frame = ttk.Frame(size_frame)
+        height_frame.pack(side=tk.LEFT, padx=(10, 0))
+        
+        ttk.Label(height_frame, text="H:").pack(side=tk.LEFT)
+        self.sample_height_var = tk.StringVar()
+        height_spin = ttk.Spinbox(
+            height_frame,
+            textvariable=self.sample_height_var,
+            from_=1, to=100,
+            width=6
+        )
+        height_spin.pack(side=tk.LEFT, padx=(2, 0))
+        
+        ttk.Label(size_frame, text="pixels", font=("TkDefaultFont", 9)).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Anchor selection
+        anchor_frame = ttk.Frame(sample_controls_frame)
+        anchor_frame.pack(fill=tk.X)
+        
+        ttk.Label(anchor_frame, text="Anchor:", width=10).pack(side=tk.LEFT)
+        self.sample_anchor_var = tk.StringVar()
+        anchor_combo = ttk.Combobox(
+            anchor_frame,
+            textvariable=self.sample_anchor_var,
+            values=['center', 'top_left', 'top_right', 'bottom_left', 'bottom_right'],
+            state='readonly',
+            width=15
+        )
+        anchor_combo.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Sample defaults info
+        sample_info_text = (
+            "These settings will be used as defaults when creating new sample areas. "
+            "You can still adjust individual samples after placing them."
+        )
+        
+        ttk.Label(
+            sample_frame,
+            text=sample_info_text,
+            wraplength=550,
+            justify=tk.LEFT,
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W, pady=(10, 0))
+        
         # Mode change info
         info_frame = ttk.LabelFrame(interface_frame, text="Information", padding="10")
         info_frame.pack(fill=tk.X, pady=(10, 0))
@@ -499,7 +594,8 @@ class PreferencesDialog:
             "• Interface mode changes take effect immediately after applying preferences\n"
             "• You can switch between modes at any time\n"
             "• Basic mode is recommended for new users and quick analysis tasks\n"
-            "• Expert mode provides access to all advanced features for specialized workflows"
+            "• Expert mode provides access to all advanced features for specialized workflows\n"
+            "• Sample area defaults apply to all new samples across all interface modes"
         )
         
         ttk.Label(
@@ -870,6 +966,12 @@ class PreferencesDialog:
         interface_mode = self.prefs_manager.get_interface_mode()
         self.interface_mode_var.set(interface_mode)
         
+        # Sample area preferences
+        self.sample_shape_var.set(self.prefs_manager.get_default_sample_shape())
+        self.sample_width_var.set(str(self.prefs_manager.get_default_sample_width()))
+        self.sample_height_var.set(str(self.prefs_manager.get_default_sample_height()))
+        self.sample_anchor_var.set(self.prefs_manager.get_default_sample_anchor())
+        
         # Update preview
         self._update_filename_preview()
     
@@ -976,6 +1078,18 @@ class PreferencesDialog:
             interface_mode = self.interface_mode_var.get()
             if interface_mode:
                 self.prefs_manager.set_interface_mode(interface_mode)
+            
+            # Sample area preferences
+            self.prefs_manager.set_default_sample_shape(self.sample_shape_var.get())
+            try:
+                width = int(self.sample_width_var.get())
+                height = int(self.sample_height_var.get())
+                self.prefs_manager.set_default_sample_width(width)
+                self.prefs_manager.set_default_sample_height(height)
+            except ValueError:
+                messagebox.showerror("Invalid Input", "Sample width and height must be valid numbers.")
+                return False
+            self.prefs_manager.set_default_sample_anchor(self.sample_anchor_var.get())
             
             # Save preferences
             success = self.prefs_manager.save_preferences()

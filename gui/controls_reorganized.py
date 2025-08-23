@@ -406,8 +406,13 @@ class ReorganizedControlPanel(ttk.Frame):
             control_container = ttk.Frame(outer_frame)
             control_container.pack(expand=True, anchor=tk.CENTER)
             
+            # Get default values from preferences
+            from utils.user_preferences import get_preferences_manager
+            prefs_manager = get_preferences_manager()
+            default_settings = prefs_manager.get_default_sample_settings()
+            
             # Shape type selection with wider dropdown
-            shape_var = tk.StringVar(value='circle')
+            shape_var = tk.StringVar(value=default_settings['shape'])
             shape_combo = ttk.Combobox(
                 control_container,
                 textvariable=shape_var,
@@ -423,9 +428,9 @@ class ReorganizedControlPanel(ttk.Frame):
                 shape_var.set(shape_combo.get())
             shape_combo.bind('<<ComboboxSelected>>', on_shape_select)
             
-            # Size spinboxes with new default values
-            width_var = tk.StringVar(value='10')
-            height_var = tk.StringVar(value='10')
+            # Size spinboxes with default values from preferences
+            width_var = tk.StringVar(value=str(default_settings['width']))
+            height_var = tk.StringVar(value=str(default_settings['height']))
             
             # Add traces to debug when values change
             # Remove redundant width/height change debug prints
@@ -459,12 +464,12 @@ class ReorganizedControlPanel(ttk.Frame):
             height_entry.bind('<KeyRelease>', on_height_entry_change)
             height_entry.bind('<FocusOut>', on_height_entry_change)
             
-            # Set initial values
-            width_var.set('10')
-            height_var.set('10')
+            # Set initial values to current defaults (will be overridden by preferences above)
+            width_var.set(str(default_settings['width']))
+            height_var.set(str(default_settings['height']))
             
-            # Anchor position
-            anchor_var = tk.StringVar(value='center')
+            # Anchor position with default from preferences
+            anchor_var = tk.StringVar(value=default_settings['anchor'])
             anchor_combo = ttk.Combobox(
                 control_container,
                 textvariable=anchor_var,
