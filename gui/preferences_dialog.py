@@ -1095,26 +1095,11 @@ class PreferencesDialog:
             success = self.prefs_manager.save_preferences()
             
             if success:
-                # If sample preferences changed, refresh the control panel
-                if sample_prefs_changed and hasattr(self, 'parent') and self.parent:
-                    try:
-                        # Try to find the main app through the parent hierarchy
-                        main_app = self.parent
-                        while main_app and not hasattr(main_app, 'control_panel'):
-                            main_app = getattr(main_app, 'master', None) or getattr(main_app, 'parent', None)
-                        
-                        if main_app and hasattr(main_app, 'control_panel'):
-                            if hasattr(main_app.control_panel, 'refresh_sample_defaults_from_preferences'):
-                                print("DEBUG: Refreshing control panel sample defaults")
-                                main_app.control_panel.refresh_sample_defaults_from_preferences()
-                            else:
-                                print("DEBUG: Control panel doesn't have refresh method")
-                        else:
-                            print("DEBUG: Could not find main app or control panel")
-                    except Exception as e:
-                        print(f"DEBUG: Error refreshing control panel: {e}")
-                
-                messagebox.showinfo("Success", "Preferences saved successfully!")
+                messagebox.showinfo(
+                    "Preferences Saved", 
+                    "Preferences saved successfully!\n\n"
+                    "Please restart StampZ_II to ensure all changes take effect."
+                )
                 return True
             else:
                 messagebox.showerror("Error", "Failed to save preferences.")
