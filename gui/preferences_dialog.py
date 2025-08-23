@@ -117,6 +117,9 @@ class PreferencesDialog:
         # Interface preferences tab
         self._create_interface_tab(notebook)
         
+        # Migration tab (only show if migration is possible)
+        self._create_migration_tab(notebook)
+        
         # Future tabs can be added here
         # self._create_general_tab(notebook)
         # self._create_appearance_tab(notebook)
@@ -506,6 +509,258 @@ class PreferencesDialog:
             justify=tk.LEFT,
             font=("TkDefaultFont", 9)
         ).pack(anchor=tk.W)
+    
+    def _create_migration_tab(self, notebook):
+        """Create the migration tab (only if migration is possible)."""
+        try:
+            from utils.migration import StampZMigration
+            migration = StampZMigration()
+            
+            # Only create tab if migration is needed or already completed
+            if not migration.is_migration_needed() and not migration.is_migration_completed():
+                return  # No migration tab needed for new users
+            
+        except ImportError:
+            return  # Migration utility not available
+        
+        migration_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(migration_frame, text="Migration")
+        
+        # Title
+        title_frame = ttk.Frame(migration_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(
+            title_frame,
+            text="StampZ to StampZ_II Migration",
+            font=("TkDefaultFont", 12, "bold")
+        ).pack(anchor=tk.W)
+        
+        if migration.is_migration_completed():
+            # Show migration completion status
+            self._create_migration_completed_section(migration_frame, migration)
+        elif migration.is_migration_needed():
+            # Show migration options
+            self._create_migration_needed_section(migration_frame, migration)
+    
+    def _create_migration_completed_section(self, parent, migration):
+        """Create section for completed migration."""
+        status_frame = ttk.LabelFrame(parent, text="Migration Status", padding="10")
+        status_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Success message
+        ttk.Label(
+            status_frame,
+            text="✅ Migration completed successfully!",
+            font=("TkDefaultFont", 11, "bold"),
+            foreground="green"
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Get migration info
+        info = migration.get_migration_info()
+        if info:
+            info_text = f"Migration Date: {info.get('Migration completed', 'Unknown')}\n"
+            info_text += f"Files Migrated: {info.get('Migrated files', 'Unknown')}\n"
+            info_text += f"Backup Created: {info.get('Backup created', 'Unknown')}"
+            
+            ttk.Label(
+                status_frame,
+                text=info_text,
+                font=("TkDefaultFont", 10)
+            ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Info about old directory
+        info_frame = ttk.LabelFrame(parent, text="Information", padding="10")
+        info_frame.pack(fill=tk.X)
+        
+        info_text = (
+            "Your data has been successfully migrated from the old StampZ directory to StampZ_II.\n\n"
+            "• All your color libraries, analysis data, and templates are now in StampZ_II\n"
+            "• The old StampZ directory has been left unchanged as a backup\n"
+            "• StampZ_II now uses the migrated data exclusively\n\n"
+            "You can safely delete the old StampZ directory if you no longer need it, "
+            "but it's recommended to keep it as a backup until you're sure everything works correctly."
+        )
+        
+        ttk.Label(
+            info_frame,
+            text=info_text,
+            wraplength=600,
+            justify=tk.LEFT,
+            font=("TkDefaultFont", 10)
+        ).pack(anchor=tk.W)
+    
+    def _create_migration_needed_section(self, parent, migration):
+        """Create section for needed migration."""
+        # Warning
+        warning_frame = ttk.LabelFrame(parent, text="Migration Available", padding="10")
+        warning_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(
+            warning_frame,
+            text="⚠️ StampZ data found that can be migrated to StampZ_II",
+            font=("TkDefaultFont", 11, "bold"),
+            foreground="orange"
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Get migration summary
+        summary = migration.get_migration_summary()
+        
+        # Summary of what will be migrated
+        summary_frame = ttk.LabelFrame(parent, text="Migration Summary", padding="10")
+        summary_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        summary_text = f"The following data from your old StampZ installation can be migrated:\n\n"
+        
+        if summary['color_libraries']:
+            summary_text += f"📚 Color Libraries ({len(summary['color_libraries'])}):")
+            for lib in summary['color_libraries']:
+                summary_text += f"\n  • {lib['name']} ({lib['size_mb']} MB)"
+            summary_text += "\n\n"
+        
+        if summary['color_analysis']:
+            summary_text += f"🔬 Color Analysis ({len(summary['color_analysis'])}):")
+            for analysis in summary['color_analysis']:
+                summary_text += f"\n  • {analysis['name']} ({analysis['size_mb']} MB)"
+            summary_text += "\n\n"
+        
+        if summary['coordinates']:
+            summary_text += f"📍 Coordinate Templates ({len(summary['coordinates'])}):")
+            for coord in summary['coordinates']:
+                summary_text += f"\n  • {coord['path']} ({coord['size_mb']} MB)"
+            summary_text += "\n\n"
+        
+        summary_text += f"Total: {summary['total_files']} files, {summary['total_size_mb']} MB"
+        
+        ttk.Label(
+            summary_frame,
+            text=summary_text,
+            font=("TkDefaultFont", 10),
+            justify=tk.LEFT
+        ).pack(anchor=tk.W)
+        
+        # Migration options
+        options_frame = ttk.LabelFrame(parent, text="Migration Options", padding="10")
+        options_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        self.create_backup_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            options_frame,
+            text="Create backup of original StampZ directory (recommended)",
+            variable=self.create_backup_var
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Migration button
+        button_frame = ttk.Frame(options_frame)
+        button_frame.pack(fill=tk.X)
+        
+        ttk.Button(
+            button_frame,
+            text="Migrate Data to StampZ_II",
+            command=lambda: self._perform_migration(migration),
+            style="Accent.TButton"
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(
+            button_frame,
+            text="Skip Migration",
+            command=self._skip_migration
+        ).pack(side=tk.LEFT)
+        
+        # Info about the process
+        info_frame = ttk.LabelFrame(parent, text="What happens during migration?", padding="10")
+        info_frame.pack(fill=tk.X)
+        
+        info_text = (
+            "1. Your old StampZ directory will be backed up (if selected)\n"
+            "2. Data will be copied to the new StampZ_II directory structure\n"
+            "3. StampZ_II will use the migrated data going forward\n"
+            "4. Your original StampZ directory remains unchanged\n\n"
+            "This process is safe and reversible - your original data is never deleted."
+        )
+        
+        ttk.Label(
+            info_frame,
+            text=info_text,
+            font=("TkDefaultFont", 10),
+            justify=tk.LEFT
+        ).pack(anchor=tk.W)
+    
+    def _perform_migration(self, migration):
+        """Perform the data migration."""
+        # Confirm with user
+        result = messagebox.askyesno(
+            "Confirm Migration",
+            "This will migrate your StampZ data to StampZ_II.\n\n"
+            "Your original StampZ directory will be preserved.\n\n"
+            "Continue with migration?"
+        )
+        
+        if not result:
+            return
+        
+        # Show progress dialog
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("Migrating Data...")
+        progress_dialog.geometry("400x150")
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # Center the progress dialog
+        progress_dialog.update_idletasks()
+        x = (progress_dialog.winfo_screenwidth() // 2) - (progress_dialog.winfo_width() // 2)
+        y = (progress_dialog.winfo_screenheight() // 2) - (progress_dialog.winfo_height() // 2)
+        progress_dialog.geometry(f"+{x}+{y}")
+        
+        progress_label = ttk.Label(progress_dialog, text="Migrating your data to StampZ_II...\nPlease wait...")
+        progress_label.pack(expand=True)
+        
+        progress_dialog.update()
+        
+        try:
+            # Perform the migration
+            create_backup = self.create_backup_var.get()
+            success, message = migration.perform_migration(create_backup=create_backup)
+            
+            progress_dialog.destroy()
+            
+            if success:
+                messagebox.showinfo("Migration Successful", message)
+                # Recreate the migration tab to show completed status
+                self._recreate_migration_tab()
+            else:
+                messagebox.showerror("Migration Failed", message)
+                
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("Migration Error", f"An error occurred during migration:\n\n{str(e)}")
+    
+    def _skip_migration(self):
+        """Skip the migration (user chooses not to migrate)."""
+        result = messagebox.askyesno(
+            "Skip Migration",
+            "Are you sure you want to skip migrating your StampZ data?\n\n"
+            "You can always migrate later from this preferences dialog.\n\n"
+            "StampZ_II will start with empty libraries and no previous data."
+        )
+        
+        if result:
+            messagebox.showinfo(
+                "Migration Skipped",
+                "Migration has been skipped. You can migrate your data later \n"
+                "by returning to this preferences dialog."
+            )
+    
+    def _recreate_migration_tab(self):
+        """Recreate the migration tab (after migration completion)."""
+        # This would require rebuilding the entire notebook, which is complex
+        # For now, just show a message that restart is recommended
+        messagebox.showinfo(
+            "Restart Recommended",
+            "Migration completed successfully!\n\n"
+            "Please restart StampZ_II to see the updated migration status.\n\n"
+            "Your migrated data is now available in StampZ_II."
+        )
     
     def _clear_remembered_directories(self):
         """Clear the remembered directories."""

@@ -859,13 +859,8 @@ class ColorComparisonManager(tk.Frame):
                 user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ_II')
             directories.append(os.path.join(user_data_dir, "data", "color_libraries"))
         
-        # Also check the old StampZ directory for backward compatibility during transition
-        # TODO: Remove this after migration is complete
-        if sys.platform == 'darwin':
-            old_user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
-            old_libraries_dir = os.path.join(old_user_data_dir, "data", "color_libraries")
-            if os.path.exists(old_libraries_dir):
-                directories.append(old_libraries_dir)
+        # Note: Backward compatibility with old StampZ directory has been removed.
+        # Users should use the migration feature in Preferences to migrate old data.
         
         return directories
     
