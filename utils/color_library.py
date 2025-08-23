@@ -41,6 +41,7 @@ class ColorMatch:
     library_color: LibraryColor
     delta_e_2000: float
     match_quality: str  # "Excellent", "Good", "Fair", "Poor", "None"
+    library_name: Optional[str] = None  # Name of the library this match came from
 
 class ColorLibrary:
     """Manages a library of reference colors with CIE L*a*b* and Delta E 2000 comparison."""
@@ -457,7 +458,8 @@ CREATE TABLE IF NOT EXISTS library_colors (
     def find_closest_matches(self, sample_lab: Tuple[float, float, float] = None,
                            sample_rgb: Tuple[float, float, float] = None,
                            max_delta_e: float = 5.0,
-                           max_results: int = 3) -> List[ColorMatch]:
+                           max_results: int = 3,
+                           include_library_name: bool = False) -> List[ColorMatch]:
         """Find the closest color matches using Delta E 2000.
         
         Args:
@@ -499,7 +501,8 @@ CREATE TABLE IF NOT EXISTS library_colors (
                 matches.append(ColorMatch(
                     library_color=lib_color,
                     delta_e_2000=delta_e_value,
-                    match_quality=quality
+                    match_quality=quality,
+                    library_name=self.library_name if include_library_name else None
                 ))
         
         # Sort by Delta E 2000 (best matches first)

@@ -826,15 +826,20 @@ class ColorComparisonManager(tk.Frame):
         """
         directories = []
         
+        # Use the unified path utility for consistency
+        from utils.path_utils import get_color_libraries_dir
+        
+        directories = []
+        
         # Check if running as PyInstaller bundle
         if hasattr(sys, '_MEIPASS'):
             # Running in PyInstaller bundle - use user data directory
             if sys.platform.startswith('linux'):
-                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
+                user_data_dir = os.path.expanduser('~/.local/share/StampZ_II')
             elif sys.platform == 'darwin':
-                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ_II')
             else:
-                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
+                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ_II')
             directories.append(os.path.join(user_data_dir, "data", "color_libraries"))
             
             # Also check bundled libraries
@@ -847,12 +852,20 @@ class ColorComparisonManager(tk.Frame):
             
             # Also check user data directory in case libraries were added while running from source
             if sys.platform.startswith('linux'):
-                user_data_dir = os.path.expanduser('~/.local/share/StampZ')
+                user_data_dir = os.path.expanduser('~/.local/share/StampZ_II')
             elif sys.platform == 'darwin':
-                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+                user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ_II')
             else:
-                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ')
+                user_data_dir = os.path.expanduser('~/AppData/Roaming/StampZ_II')
             directories.append(os.path.join(user_data_dir, "data", "color_libraries"))
+        
+        # Also check the old StampZ directory for backward compatibility during transition
+        # TODO: Remove this after migration is complete
+        if sys.platform == 'darwin':
+            old_user_data_dir = os.path.expanduser('~/Library/Application Support/StampZ')
+            old_libraries_dir = os.path.join(old_user_data_dir, "data", "color_libraries")
+            if os.path.exists(old_libraries_dir):
+                directories.append(old_libraries_dir)
         
         return directories
     
@@ -941,12 +954,17 @@ class ColorComparisonManager(tk.Frame):
                 # Combine results from all libraries
                 all_matches = []
                 for lib in self.all_libraries:
-                    result = lib.compare_sample_to_library(
+                    # Get matches from this library with library name included
+                    lib_matches = lib.find_closest_matches(
                         sample_lab=avg_lab,
-                        threshold=self.delta_e_threshold
+                        max_delta_e=self.delta_e_threshold,
+                        max_results=5,  # Get more from each library
+                        include_library_name=True
                     )
-                    if result and 'matches' in result:
-                        all_matches.extend(result['matches'])
+                    # Set the library name for each match
+                    for match in lib_matches:
+                        match.library_name = lib.library_name
+                    all_matches.extend(lib_matches)
                 
                 # Sort combined matches by delta_e
                 all_matches.sort(key=lambda x: x.delta_e_2000)
@@ -981,6 +999,10 @@ class ColorComparisonManager(tk.Frame):
                 rgb = match.library_color.rgb
                 value_text = (f"L*: {lab[0]:>6.1f}  a*: {lab[1]:>6.1f}  b*: {lab[2]:>6.1f}    ΔE: {match.delta_e_2000:>6.2f}\n" +
                              f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}    {match.library_color.name}")
+                
+                # Add library name if available (for "All Libraries" searches)
+                if hasattr(match, 'library_name') and match.library_name:
+                    value_text += f"\nLibrary: {match.library_name}"
                 
                 ttk.Label(frame, text=value_text, font=("Arial", 12)).pack(side=tk.LEFT, padx=20)
                 
