@@ -24,7 +24,7 @@ class RecentFilesManager:
         """
         self.max_files = max_files
         
-        # Use the environment variable if set, otherwise fall back to default paths
+        # Use the environment variable if set, otherwise use centralized path logic
         stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
         
         if recent_dir:
@@ -33,18 +33,25 @@ class RecentFilesManager:
             self.recent_dir = Path(stampz_data_dir) / 'recent'
             logger.info(f"Using recent directory from STAMPZ_DATA_DIR: {self.recent_dir}")
         else:
-            # Use platform-specific user data directory for recent files
-            if sys.platform == 'win32':
-                app_data = os.getenv('APPDATA')
-                if app_data:
-                    self.recent_dir = Path(app_data) / 'StampZ_II' / 'recent'
-                else:
+            # Use centralized path logic to be consistent with rest of app
+            try:
+                from .path_utils import get_base_data_dir
+                base_data_dir = Path(get_base_data_dir())
+                self.recent_dir = base_data_dir.parent / 'recent'
+                logger.info(f"Using centralized recent directory: {self.recent_dir}")
+            except ImportError:
+                # Fallback to original logic if path_utils not available
+                if sys.platform == 'win32':
+                    app_data = os.getenv('APPDATA')
+                    if app_data:
+                        self.recent_dir = Path(app_data) / 'StampZ_II' / 'recent'
+                    else:
+                        self.recent_dir = Path.home() / '.stampz_ii' / 'recent'
+                elif sys.platform == 'darwin':
+                    self.recent_dir = Path.home() / 'Library' / 'Application Support' / 'StampZ_II' / 'recent'
+                else:  # Linux and others
                     self.recent_dir = Path.home() / '.stampz_ii' / 'recent'
-            elif sys.platform == 'darwin':
-                self.recent_dir = Path.home() / 'Library' / 'Application Support' / 'StampZ_II' / 'recent'
-            else:  # Linux and others
-                self.recent_dir = Path.home() / '.stampz_ii' / 'recent'
-            logger.info(f"Using default recent directory: {self.recent_dir}")
+                logger.info(f"Using fallback recent directory: {self.recent_dir}")
         
         # Ensure recent directory exists
         try:

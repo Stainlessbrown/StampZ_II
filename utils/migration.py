@@ -211,6 +211,46 @@ class StampZMigration:
                         logger.info(f"Migrated coordinates: {old_coord_file}")
                         break  # Only migrate the first one found
             
+            # Migrate recent files
+            old_recent_dir = self.old_base_dir / 'recent'
+            new_recent_dir = self.new_base_dir / 'recent'
+            if old_recent_dir.exists():
+                new_recent_dir.mkdir(exist_ok=True)
+                recent_files_migrated = 0
+                for recent_file in old_recent_dir.glob('*'):
+                    if recent_file.is_file():
+                        dest_file = new_recent_dir / recent_file.name
+                        if not dest_file.exists():  # Don't overwrite existing files
+                            shutil.copy2(recent_file, dest_file)
+                            recent_files_migrated += 1
+                            logger.info(f"Migrated recent file: {recent_file.name}")
+                if recent_files_migrated > 0:
+                    migrated_files.append(f"Recent files ({recent_files_migrated} files)")
+            
+            # Migrate exports directory
+            old_exports_dir = self.old_base_dir / 'exports'
+            new_exports_dir = self.new_base_dir / 'exports'
+            if old_exports_dir.exists():
+                new_exports_dir.mkdir(exist_ok=True)
+                exported_files_migrated = 0
+                for export_file in old_exports_dir.glob('*'):
+                    if export_file.is_file():
+                        dest_file = new_exports_dir / export_file.name
+                        if not dest_file.exists():  # Don't overwrite existing files
+                            shutil.copy2(export_file, dest_file)
+                            exported_files_migrated += 1
+                            logger.info(f"Migrated export file: {export_file.name}")
+                if exported_files_migrated > 0:
+                    migrated_files.append(f"Export files ({exported_files_migrated} files)")
+            
+            # Migrate preferences.json
+            old_prefs_file = self.old_base_dir / 'preferences.json'
+            new_prefs_file = self.new_base_dir / 'preferences.json'
+            if old_prefs_file.exists() and not new_prefs_file.exists():
+                shutil.copy2(old_prefs_file, new_prefs_file)
+                migrated_files.append("User preferences")
+                logger.info(f"Migrated preferences: {old_prefs_file}")
+            
             # Create migration completion marker
             marker_file = self.new_base_dir / '.migration_completed'
             with marker_file.open('w') as f:
