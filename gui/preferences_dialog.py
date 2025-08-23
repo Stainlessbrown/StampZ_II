@@ -482,7 +482,7 @@ class PreferencesDialog:
         
         ttk.Label(
             expert_frame,
-            text="• All advanced controls and options\n• Complete sampling algorithm details\n• Advanced calibration settings\n• Full statistical methods access",
+            text="• All advanced controls and options\n• Complete sampling algorithm details\n• Full statistical methods access\n• Advanced sampling and analysis features",
             font=("TkDefaultFont", 10),
             foreground="#444444",
             justify=tk.LEFT

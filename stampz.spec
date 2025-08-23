@@ -66,11 +66,11 @@ hiddenimports += [
 # Platform specific settings
 if sys.platform == 'darwin':
     # macOS
-    icon_path = 'StampZ.icns' if os.path.exists('StampZ.icns') else None
+    icon_path = 'StampZ_II.icns' if os.path.exists('StampZ_II.icns') else None
     onefile = False  # Use --onedir for app bundles
 elif sys.platform == 'win32':
     # Windows
-    icon_path = 'resources/StampZ.ico' if os.path.exists('resources/StampZ.ico') else None
+    icon_path = 'resources/StampZ_II_icon.ico' if os.path.exists('resources/StampZ_II_icon.ico') else None
     onefile = True
 else:
     # Linux
@@ -105,7 +105,7 @@ if onefile:
         a.binaries,
         a.datas,
         [],
-        name='StampZ',
+        name='StampZ_II',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -126,7 +126,7 @@ else:
         a.scripts,
         [],
         exclude_binaries=True,
-        name='StampZ',
+        name='StampZ_II',
         debug=False,
         bootloader_ignore_signals=False,
         strip=False,
@@ -147,15 +147,15 @@ else:
         strip=False,
         upx=True,
         upx_exclude=[],
-        name='StampZ',
+        name='StampZ_II',
     )
     
     # macOS app bundle
     if sys.platform == 'darwin':
         app = BUNDLE(
             coll,
-            name='StampZ.app',
+            name='StampZ_II.app',
             icon=icon_path,
-            bundle_identifier='com.stainlessbrown.stampz',
+            bundle_identifier='com.stainlessbrown.stampz_ii',
             version=VERSION,
         )

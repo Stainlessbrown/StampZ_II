@@ -3,9 +3,9 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "StampZ"
-version = "1.7.2"
-description = "A tool for image processing and color conversion."
+name = "StampZ II"
+version = "2.0.1"
+description = "An advanced  tool for image processing and color conversion."
 authors = [
   { name="Your Name", email="your.email@example.com" }
 ]

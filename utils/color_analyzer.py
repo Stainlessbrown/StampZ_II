@@ -29,7 +29,6 @@ except ImportError:
 
 from .coordinate_db import CoordinateDB, CoordinatePoint, SampleAreaType
 from .color_analysis_db import ColorAnalysisDB
-from .color_calibration import ColorCalibrator
 
 @dataclass
 class ColorMeasurement:
@@ -46,7 +45,7 @@ class ColorMeasurement:
 class ColorAnalyzer:
     """Analyze colors from coordinate sample areas."""
     
-    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED, load_calibration: bool = True, calibration_mode: bool = False):
+    def __init__(self, print_type: PrintType = PrintType.SOLID_PRINTED):
         """Initialize color analyzer.
         
         Args:
@@ -54,21 +53,9 @@ class ColorAnalyzer:
                        Affects how color sampling is performed.
                        LINE_ENGRAVED for line-engraved/intaglio stamps
                        SOLID_PRINTED for lithograph, photogravure, etc.
-            load_calibration: Whether to load saved calibration settings.
-                            Set to False for calibration sampling to avoid circular correction.
-            calibration_mode: If True, disables stamp-specific pixel filtering to allow
-                            accurate sampling of reference colors like pure white.
         """
         self.db = CoordinateDB()
         self.print_type = print_type
-        self.calibrator = ColorCalibrator()
-        self.color_correction = None  # Will hold correction matrix if calibrated
-        self.load_calibration = load_calibration  # Remember user preference
-        self.calibration_mode = calibration_mode  # Disable stamp filtering for calibration
-        
-        # Load saved calibration if available and requested
-        if load_calibration:
-            self.load_saved_calibration()
     
     def rgb_to_lab(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
         """Convert RGB to CIE L*a*b* color space.
@@ -415,7 +402,7 @@ class ColorAnalyzer:
                             
                         r, g, b = pixel[:3]
                         
-                        # In calibration mode, accept ALL pixels including pure white
+                        # Sample all pixels as-is for accurate color measurement
                         # Otherwise, sample all pixels as-is for accurate color measurement
                             
                         # Record actual pixel values without modifying them
@@ -493,18 +480,10 @@ class ColorAnalyzer:
         avg_g = total_g / num_pixels
         avg_b = total_b / num_pixels
         
-        # Apply color correction if calibrated
-        uncorrected_rgb = (avg_r, avg_g, avg_b)
-        corrected_rgb = self.apply_color_correction(uncorrected_rgb)
+        # Return the raw RGB values without any correction
+        print(f"Final average RGB values: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
         
-        # For debugging - show both values if correction was applied
-        if self.is_calibrated():
-            print(f"Original average RGB: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
-            print(f"Corrected RGB values: R={corrected_rgb[0]:.2f}, G={corrected_rgb[1]:.2f}, B={corrected_rgb[2]:.2f}")
-        else:
-            print(f"Final average RGB values: R={avg_r:.2f}, G={avg_g:.2f}, B={avg_b:.2f}")
-            
-        return corrected_rgb
+        return (avg_r, avg_g, avg_b)
     
     def save_color_measurements(self, measurements: List[ColorMeasurement], coordinate_set_name: str, image_name: str) -> bool:
         """Save color measurements to the separate sample set database.
@@ -885,93 +864,6 @@ class ColorAnalyzer:
             
         return measurements
     
-    def load_saved_calibration(self):
-        """Load saved calibration settings from enhanced calibration system only."""
-        # Only use enhanced calibration (accurate and comprehensive)
-        return self._load_enhanced_calibration()
-    
-    def _load_enhanced_calibration(self):
-        """Try to load enhanced calibration files."""
-        try:
-            import json
-            
-            # Check for enhanced calibration files
-            calibration_files = [
-                'stampz_calibration_enhanced.json',
-                'stampz_calibration.json'
-            ]
-            
-            for cal_file in calibration_files:
-                if os.path.exists(cal_file):
-                    with open(cal_file, 'r') as f:
-                        cal_data = json.load(f)
-                    
-                    if 'calibration_matrix' in cal_data:
-                        self.color_correction = cal_data['calibration_matrix']
-                        corrections = self.color_correction.get('corrections', {})
-                        
-                        # Check if this is enhanced per-color calibration
-                        if 'per_color_corrections' in corrections:
-                            print(f"Loaded enhanced per-color calibration from {cal_file}")
-                        else:
-                            print(f"Loaded standard calibration from {cal_file}")
-                            
-                        return True
-            
-            return False
-            
-        except Exception as e:
-            print(f"Warning: Could not load enhanced calibration: {e}")
-            return False
-    
-    def apply_color_correction(self, rgb: Tuple[float, float, float]) -> Tuple[float, float, float]:
-        """Apply color correction using the enhanced calibration system.
-        
-        Args:
-            rgb: Original RGB tuple
-            
-        Returns:
-            Corrected RGB tuple (or original if not calibrated)
-        """
-        if self.color_correction is None:
-            # Only try to load calibration if it was requested during init
-            if self.load_calibration and not self._load_enhanced_calibration():
-                return rgb
-            elif not self.load_calibration:
-                # Explicitly disabled calibration loading
-                return rgb
-        
-        # Convert to int tuple for correction
-        rgb_int = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
-        
-        # Use the enhanced color correction calculator for consistent results
-        try:
-            from color_correction_calculator import correct_color
-            corrected_int, method_used = correct_color(*rgb_int, method='dynamic')
-            
-            # Log the correction method used (for first few corrections only)
-            if not hasattr(self, '_correction_method_logged'):
-                print(f"Using color correction method: {method_used}")
-                self._correction_method_logged = True
-                
-            return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
-            
-        except Exception as e:
-            print(f"Warning: Enhanced calibration failed, using fallback: {e}")
-            # Fallback to original calibration method
-            if self.color_correction:
-                corrected_int = self.calibrator.apply_correction(rgb_int, self.color_correction)
-                return (float(corrected_int[0]), float(corrected_int[1]), float(corrected_int[2]))
-            else:
-                return rgb
-    
-    def is_calibrated(self) -> bool:
-        """Check if color calibration is active.
-        
-        Returns:
-            True if calibrated, False otherwise
-        """
-        return self.color_correction is not None
 
 # Utility function for quick color analysis
 def analyze_colors(image_path: str, coordinate_set_name: str, print_type: PrintType = PrintType.SOLID_PRINTED) -> None:

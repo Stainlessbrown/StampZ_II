@@ -33,10 +33,10 @@ class StampZApp:
         ensure_data_directories()
         
         self.root = root
-        self.root.title("StampZ")
+        self.root.title("StampZ_II")
         self._set_application_name()
         try:
-            self.root.tk.call('wm', 'class', self.root, 'StampZ')
+            self.root.tk.call('wm', 'class', self.root, 'StampZ_II')
         except:
             pass
         # Use the environment variable for recent files directory
@@ -92,7 +92,7 @@ class StampZApp:
 
     def _set_application_name(self):
         try:
-            self.root.tk.call('tk', 'appname', 'StampZ')
+            self.root.tk.call('tk', 'appname', 'StampZ_II')
         except:
             pass
 
@@ -123,9 +123,6 @@ class StampZApp:
         self.color_menu.add_command(label="Create Standard Libraries", command=self.create_standard_libraries)
         self.color_menu.add_separator()
         self.color_menu.add_command(label="Spectral Analysis...", command=self.open_spectral_analysis)
-        self.color_menu.add_separator()
-        self.color_menu.add_command(label="Calibrate Color Accuracy...", command=self.open_color_calibration)
-        self.color_menu.add_separator()
         self.color_menu.add_command(label="Export Analysis with Library Matches...", command=self.export_with_library_matches)
 
         self.help_menu = tk.Menu(self.menubar, tearoff=0)
@@ -1905,21 +1902,6 @@ class StampZApp:
                 f"Failed to open spectral analysis:\n\n{str(e)}"
             )
 
-    def open_color_calibration(self):
-        """Open the color calibration wizard."""
-        try:
-            from gui.calibration_wizard import show_calibration_wizard
-            show_calibration_wizard(parent=self.root)
-        except ImportError as e:
-            messagebox.showerror(
-                "Missing Component",
-                f"Color calibration wizard not available:\n\n{str(e)}"
-            )
-        except Exception as e:
-            messagebox.showerror(
-                "Error",
-                f"Failed to open color calibration wizard:\n\n{str(e)}"
-            )
 
     def open_preferences(self):
         """Open the preferences dialog."""

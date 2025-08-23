@@ -47,17 +47,17 @@ jobs:
       run: |
         # Create icns file from PNG for macOS
         mkdir -p StampZ.iconset
-        # Use sips (built into macOS) to create different sizes
-        sips -z 16 16 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16.png"
-        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16@2x.png"
-        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32.png"
-        sips -z 64 64 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32@2x.png"
-        sips -z 128 128 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128.png"
-        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128@2x.png"
-        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256.png"
-        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256@2x.png"
-        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512.png"
-        sips -z 1024 1024 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png" 2>/dev/null || sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png"
+        # Use sips (built into macOS) to create different sizes from StampZ_II icon
+        sips -z 16 16 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_16x16.png"
+        sips -z 32 32 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_16x16@2x.png"
+        sips -z 32 32 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_32x32.png"
+        sips -z 64 64 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_32x32@2x.png"
+        sips -z 128 128 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_128x128.png"
+        sips -z 256 256 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_128x128@2x.png"
+        sips -z 256 256 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_256x256.png"
+        sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_256x256@2x.png"
+        sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512.png"
+        sips -z 1024 1024 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512@2x.png" 2>/dev/null || sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512@2x.png"
         # Create the icns file
         iconutil -c icns StampZ.iconset
         ls -la StampZ.icns
@@ -187,7 +187,7 @@ jobs:
     permissions:
       actions: write
     steps:
-    - name: Delete old artifacts
+    - name: Delete old artifacts (keep current + previous builds)
       uses: actions/github-script@v7
       with:
         script: |
@@ -196,14 +196,65 @@ jobs:
             repo: context.repo.repo,
           });
           
-          // Keep only the 5 most recent artifacts
-          const artifactsToDelete = artifacts.data.artifacts.slice(5);
+          // Sort artifacts by creation time (newest first)
+          const sortedArtifacts = artifacts.data.artifacts.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
           
-          for (const artifact of artifactsToDelete) {
-            console.log(`Deleting artifact: ${artifact.name} (${artifact.id})`);
-            await github.rest.actions.deleteArtifact({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              artifact_id: artifact.id,
-            });
+          // Group artifacts by workflow run (each build creates 4 artifacts: mac-intel, mac-arm, windows-x64, linux-x64)
+          const artifactsByWorkflowRun = {};
+          for (const artifact of sortedArtifacts) {
+            const runId = artifact.workflow_run.id;
+            if (!artifactsByWorkflowRun[runId]) {
+              artifactsByWorkflowRun[runId] = [];
+            }
+            artifactsByWorkflowRun[runId].push(artifact);
+          }
+          
+          // Get sorted workflow run IDs (newest first)
+          const workflowRunIds = Object.keys(artifactsByWorkflowRun).sort((a, b) => {
+            const aTime = Math.max(...artifactsByWorkflowRun[a].map(art => new Date(art.created_at).getTime()));
+            const bTime = Math.max(...artifactsByWorkflowRun[b].map(art => new Date(art.created_at).getTime()));
+            return bTime - aTime;
+          });
+          
+          console.log(`Found ${workflowRunIds.length} workflow runs with artifacts`);
+          
+          // Keep current build (index 0) and previous build (index 1), delete the rest
+          const runsToKeep = 2;
+          const runsToDelete = workflowRunIds.slice(runsToKeep);
+          
+          console.log(`Keeping artifacts from ${Math.min(runsToKeep, workflowRunIds.length)} most recent builds`);
+          console.log(`Deleting artifacts from ${runsToDelete.length} older builds`);
+          
+          let deletedCount = 0;
+          for (const runId of runsToDelete) {
+            const runArtifacts = artifactsByWorkflowRun[runId];
+            console.log(`Deleting ${runArtifacts.length} artifacts from workflow run ${runId}`);
+            
+            for (const artifact of runArtifacts) {
+              try {
+                console.log(`  - Deleting: ${artifact.name} (ID: ${artifact.id})`);
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id,
+                });
+                deletedCount++;
+              } catch (error) {
+                console.log(`  - Failed to delete ${artifact.name}: ${error.message}`);
+              }
+            }
+          }
+          
+          console.log(`Successfully deleted ${deletedCount} artifacts`);
+          
+          // Log what we're keeping
+          const keptRuns = workflowRunIds.slice(0, runsToKeep);
+          for (let i = 0; i < keptRuns.length; i++) {
+            const runId = keptRuns[i];
+            const runArtifacts = artifactsByWorkflowRun[runId];
+            const buildType = i === 0 ? 'CURRENT' : 'PREVIOUS';
+            console.log(`${buildType} BUILD (Run ${runId}): keeping ${runArtifacts.length} artifacts`);
+            runArtifacts.forEach(art => console.log(`  - ${art.name}`));
           }

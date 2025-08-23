@@ -389,7 +389,7 @@ class PreferencesManager:
             # Ensure the preferences directory exists
             self.prefs_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Load existing preferences to preserve other sections (like color calibration)
+            # Load existing preferences to preserve other sections
             existing_data = {}
             if self.prefs_file.exists():
                 try:
