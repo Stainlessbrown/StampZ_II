@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 def get_app_data_dir():
     """Get the appropriate application data directory based on platform."""
     if sys.platform == 'darwin':  # macOS
-        return Path.home() / 'Library' / 'Application Support' / 'StampZ'
+        return Path.home() / 'Library' / 'Application Support' / 'StampZ_II'
     elif sys.platform == 'win32':  # Windows
         app_data = os.getenv('APPDATA')
-        return Path(app_data) / 'StampZ' if app_data else Path.home() / '.stampz'
+        return Path(app_data) / 'StampZ_II' if app_data else Path.home() / '.stampz_ii'
     else:  # Linux and others
-        return Path.home() / '.local' / 'share' / 'StampZ'
+        return Path.home() / '.local' / 'share' / 'StampZ_II'
 
 def copy_directory_contents(src_dir: Path, dest_dir: Path):
     """Copy contents of src_dir to dest_dir, preserving directory structure."""
