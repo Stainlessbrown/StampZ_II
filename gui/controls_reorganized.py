@@ -1478,6 +1478,35 @@ class ReorganizedControlPanel(ttk.Frame):
             print("DEBUG: main_app not found for add to library")
             messagebox.showinfo("Info", "Add to library - connect to main app implementation")
     
+    def refresh_sample_defaults_from_preferences(self):
+        """Refresh sample controls with current preference defaults."""
+        print("DEBUG: Refreshing sample controls with current preferences")
+        try:
+            # Get current preference defaults
+            from utils.user_preferences import get_preferences_manager
+            prefs_manager = get_preferences_manager()
+            default_settings = prefs_manager.get_default_sample_settings()
+            
+            print(f"DEBUG: New default settings: {default_settings}")
+            
+            # Update each sample control with the new defaults
+            for i, control in enumerate(self.sample_controls):
+                # Update shape
+                control['shape'].set(default_settings['shape'])
+                
+                # Update width and height
+                control['width'].set(str(default_settings['width']))
+                control['height'].set(str(default_settings['height']))
+                
+                # Update anchor
+                control['anchor'].set(default_settings['anchor'])
+                
+                print(f"DEBUG: Updated sample {i+1} with new defaults")
+                
+        except Exception as e:
+            print(f"DEBUG: Error refreshing sample defaults: {e}")
+            messagebox.showerror("Error", f"Failed to refresh sample defaults:\n{e}")
+    
     def _open_database_viewer(self):
         """Open database viewer for examining color analysis data."""
         if hasattr(self, 'main_app') and self.main_app:

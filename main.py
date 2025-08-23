@@ -1908,6 +1908,12 @@ class StampZApp:
         result = show_preferences_dialog(self.root)
         if result == "ok":
             print("Preferences updated successfully.")
+            # Refresh sample controls to pick up any new default settings
+            if hasattr(self.control_panel, 'refresh_sample_defaults_from_preferences'):
+                print("DEBUG: Refreshing sample defaults after preferences change")
+                self.control_panel.refresh_sample_defaults_from_preferences()
+            else:
+                print("DEBUG: Control panel doesn't have refresh method")
 
     def _get_available_libraries(self):
         """Get list of available color libraries."""
