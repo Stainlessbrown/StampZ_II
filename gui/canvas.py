@@ -330,10 +330,13 @@ class CropCanvas(tk.Canvas):
         self.bind('<B1-Motion>', self._on_drag)
         self.bind('<ButtonRelease-1>', self._on_release)
         
-        # Right click for panning
-        self.bind('<Button-3>', self._on_pan_start)  # Right click
-        self.bind('<B3-Motion>', self._on_pan)
-        self.bind('<ButtonRelease-3>', self._on_pan_end)
+        # Right click for panning (handle both Button-2 and Button-3 for cross-platform compatibility)
+        self.bind('<Button-2>', self._on_pan_start)  # Right click (macOS/some systems)
+        self.bind('<Button-3>', self._on_pan_start)  # Right click (Linux/Windows)
+        self.bind('<B2-Motion>', self._on_pan)       # Right drag (macOS/some systems)
+        self.bind('<B3-Motion>', self._on_pan)       # Right drag (Linux/Windows)
+        self.bind('<ButtonRelease-2>', self._on_pan_end)  # Right release (macOS/some systems)
+        self.bind('<ButtonRelease-3>', self._on_pan_end)  # Right release (Linux/Windows)
         
         # Mouse wheel for zooming
         self.bind('<MouseWheel>', self._on_zoom)
@@ -343,6 +346,9 @@ class CropCanvas(tk.Canvas):
         # Other events
         self.bind('<Motion>', self._on_motion)
         self.bind('<Configure>', self._on_resize)
+        
+        # Make sure canvas can get focus for events
+        self.focus_set()
     
     def _on_click(self, event: tk.Event) -> None:
         """Handle mouse click events."""
@@ -426,23 +432,32 @@ class CropCanvas(tk.Canvas):
     
     def _on_pan_start(self, event: tk.Event) -> None:
         """Handle right-click pan start."""
+        print(f"DEBUG: Right-click pan start at ({event.x}, {event.y})")
         if not self.core.original_image:
+            print("DEBUG: No original image for panning")
             return
+        print("DEBUG: Starting pan operation")
         self.core.handle_pan_start(event.x, event.y)
         self.configure(cursor='fleur')
     
     def _on_pan(self, event: tk.Event) -> None:
         """Handle right-click panning."""
+        print(f"DEBUG: Right-click pan motion at ({event.x}, {event.y})")
         if not self.core.original_image:
             return
         if self.core.panning:
+            print(f"DEBUG: Panning to ({event.x}, {event.y})")
             self.core.handle_pan(event.x, event.y)
             self.update_display()
+        else:
+            print("DEBUG: Panning not active")
     
     def _on_pan_end(self, event: tk.Event) -> None:
         """Handle right-click pan end."""
+        print(f"DEBUG: Right-click pan end at ({event.x}, {event.y})")
         if not self.core.original_image:
             return
+        print("DEBUG: Ending pan operation")
         self.core.handle_pan_end()
         self.configure(cursor='')
     
