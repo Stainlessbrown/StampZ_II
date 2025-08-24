@@ -429,7 +429,7 @@ class CropCanvas(tk.Canvas):
         if not self.core.original_image:
             return
         self.core.handle_pan_start(event.x, event.y)
-        self.canvas.configure(cursor='fleur')
+        self.configure(cursor='fleur')
     
     def _on_pan(self, event: tk.Event) -> None:
         """Handle right-click panning."""
@@ -444,7 +444,7 @@ class CropCanvas(tk.Canvas):
         if not self.core.original_image:
             return
         self.core.handle_pan_end()
-        self.canvas.configure(cursor='')
+        self.configure(cursor='')
     
     def _on_zoom(self, event: tk.Event) -> None:
         """Handle zoom events."""
