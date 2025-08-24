@@ -173,8 +173,9 @@ class ColorComparisonManager(tk.Frame):
         # Calculate new dimensions maintaining proportions
         scale_factor = min(width / self.IDEAL_WIDTH, height / (self.MIN_HEIGHT * 1.5))
         
-        # Calculate new sizes
-        new_swatch_width = int(self.IDEAL_WIDTH * self.SWATCH_WIDTH_RATIO * scale_factor)
+        # Calculate new sizes - increase base swatch width for comparison view
+        base_swatch_width = max(500, int(self.IDEAL_WIDTH * self.SWATCH_WIDTH_RATIO * scale_factor))
+        new_swatch_width = base_swatch_width
         new_swatch_height = int(new_swatch_width / self.SWATCH_ASPECT_RATIO)
         new_avg_swatch_height = int(new_swatch_width / self.AVG_SWATCH_ASPECT_RATIO)
         new_padding = int(self.MIN_PADDING * scale_factor)
@@ -193,7 +194,8 @@ class ColorComparisonManager(tk.Frame):
         if hasattr(self, 'average_frame'):
             self.average_frame.configure(width=new_swatch_width + 2 * new_padding)
         if hasattr(self, 'matches_frame'):
-            self.matches_frame.configure(width=width - 2 * new_padding)
+            # Make matches frame use more of the available width
+            self.matches_frame.configure(width=max(width - 2 * new_padding, 1200))
     
     def set_analyzed_data(self, image_path: str, sample_data: List[Dict]):
         """Set the analyzed image path and sample data.
@@ -980,40 +982,48 @@ class ColorComparisonManager(tk.Frame):
             
             # Display matches
             for match in matches:
-                # Container frame for centering
+                # Container frame using grid for better structure
                 container = ttk.Frame(self.matches_frame)
                 container.pack(fill=tk.X, pady=2)
-                container.grid_columnconfigure(0, weight=1)  # Center content
                 
-                # Inner frame for match content
-                frame = ttk.Frame(container)
-                frame.grid(row=0, column=0)  # Will be centered due to container's weight
+                # Configure grid layout - use 3 columns
+                container.grid_columnconfigure(0, weight=1)  # Color values - takes available space
+                container.grid_columnconfigure(1, weight=0)  # Color name - fixed width
+                container.grid_columnconfigure(2, weight=0)  # Color swatch - fixed width
                 
-                # Color values with ΔE
+                # Color values with ΔE (left-aligned)
                 lab = match.library_color.lab
                 rgb = match.library_color.rgb
-                value_text = (f"L*: {lab[0]:>6.1f}  a*: {lab[1]:>6.1f}  b*: {lab[2]:>6.1f}    ΔE: {match.delta_e_2000:>6.2f}\n" +
-                             f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}    {match.library_color.name}")
+                value_text = (f"L*: {lab[0]:.1f}  a*: {lab[1]:.1f}  b*: {lab[2]:.1f}    ΔE: {match.delta_e_2000:.2f}\n" +
+                             f"R: {int(rgb[0])}  G: {int(rgb[1])}  B: {int(rgb[2])}")
                 
+                # Create lab/rgb values label - left aligned
+                values_label = ttk.Label(container, text=value_text, font=("Arial", 12), anchor="w")
+                values_label.grid(row=0, column=0, padx=(20, 5), pady=2, sticky="w")
+                
+                # Create separate color name label - left aligned
+                name_text = match.library_color.name
                 # Add library name if available (for "All Libraries" searches)
                 if hasattr(match, 'library_name') and match.library_name:
-                    value_text += f"\nLibrary: {match.library_name}"
+                    name_text += f"\nLibrary: {match.library_name}"
                 
-                ttk.Label(frame, text=value_text, font=("Arial", 12)).pack(side=tk.LEFT, padx=20)
+                name_label = ttk.Label(container, text=name_text, font=("Arial", 12), anchor="w")
+                name_label.grid(row=0, column=1, padx=5, pady=2, sticky="w")
                 
-                # Color swatch
+                # Color swatch - increase width to 500
+                swatch_width = min(500, self.current_sizes.get('swatch_width', 500))  # Use dynamic width with min of 500
                 canvas = tk.Canvas(
-                    frame,
-                    width=450,
+                    container,
+                    width=swatch_width,
                     height=60,
                     highlightthickness=1,
                     highlightbackground='gray'
                 )
-                canvas.pack(side=tk.RIGHT, padx=(5, 10), pady=2)  # Added right padding for centering
+                canvas.grid(row=0, column=2, padx=(5, 20), pady=2, sticky="e")
                 
                 # Create rectangle for color display
                 canvas.create_rectangle(
-                    0, 0, 450, 60,
+                    0, 0, swatch_width, 60,
                     fill=f"#{int(rgb[0]):02x}{int(rgb[1]):02x}{int(rgb[2]):02x}",
                     outline=''
                 )
