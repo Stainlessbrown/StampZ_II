@@ -270,18 +270,12 @@ class TemplateProtectionManager:
             dialog.destroy()
             self.show_save_as_dialog()
         
-        def show_comparison():
-            dialog.destroy()
-            self.show_before_after_comparison()
-        
         def revert_changes():
             self._revert_to_original()
             dialog.destroy()
         
         ttk.Button(button_frame, text="Save As New Template", 
                   command=save_as_new).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Show Comparison", 
-                  command=show_comparison).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Revert Changes", 
                   command=revert_changes).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Continue Analysis", 
@@ -396,13 +390,6 @@ class TemplateProtectionManager:
             
             # Save the modified template to the coordinate database
             if self._save_modified_template_to_db(name):
-                # Store comparison data before removing protection
-                comparison_data = {
-                    'original_template_name': self.original_template_name,
-                    'original_parameters': deepcopy(self.original_parameters),
-                    'current_parameters': deepcopy(self.current_parameters)
-                }
-                
                 # Update template name and remove protection
                 self.control_panel.sample_set_name.set(name)
                 
@@ -446,9 +433,6 @@ class TemplateProtectionManager:
                     self.control_panel._refresh_sample_sets(show_feedback=False)
                     print("DEBUG: Refreshed template selector dropdown")
                 
-                # Store comparison data for later use
-                self._saved_comparison_data = comparison_data
-                
                 # DON'T remove protection yet - we need it for the new template
                 # Instead, update the protection to the new template name and parameters
                 self.original_template_name = name
@@ -462,8 +446,12 @@ class TemplateProtectionManager:
                 save_button.config(state='disabled')
                 name_entry.config(state='disabled')
                 
-                # Add new buttons after save
-                self._add_post_save_buttons(dialog, button_frame)
+                # Add close button after successful save
+                ttk.Button(
+                    button_frame, 
+                    text="Close", 
+                    command=dialog.destroy
+                ).pack(side=tk.RIGHT, padx=5)
             else:
                 # Show error if save failed
                 validation_label.config(text=f"Failed to save template '{name}'. Please try again.")
@@ -578,232 +566,7 @@ class TemplateProtectionManager:
         confirm_dialog.wait_window()
         return result['confirmed']
     
-    def _add_post_save_buttons(self, dialog, button_frame):
-        """Add buttons that appear after successful save."""
-        # Add comparison and close buttons
-        ttk.Button(
-            button_frame, 
-            text="Show Comparison", 
-            command=lambda: self._show_comparison_from_save_dialog(dialog)
-        ).pack(side=tk.LEFT, padx=(20, 5))
-        
-        ttk.Button(
-            button_frame, 
-            text="Close", 
-            command=dialog.destroy
-        ).pack(side=tk.RIGHT, padx=5)
     
-    def _show_comparison_from_save_dialog(self, save_dialog):
-        """Show comparison dialog from save dialog context."""
-        # Hide the save dialog temporarily
-        save_dialog.withdraw()
-        
-        # Show NON-MODAL comparison
-        self.show_before_after_comparison_non_modal()
-        
-        # Close save dialog after comparison is shown
-        save_dialog.destroy()
-    
-    def show_before_after_comparison(self) -> None:
-        """Show before/after comparison of template parameters."""
-        # Debug information
-        print(f"DEBUG: Comparison dialog - Protected: {self.is_protected}")
-        print(f"DEBUG: Original template: {self.original_template_name}")
-        print(f"DEBUG: Original params count: {len(self.original_parameters)}")
-        print(f"DEBUG: Current params count: {len(self.current_parameters)}")
-        
-        if not self.is_protected or not self.original_parameters:
-            messagebox.showwarning("No Comparison Data", "No template protection data available for comparison.")
-            return
-        
-        dialog = tk.Toplevel(self.control_panel)
-        dialog.title("Template Comparison")
-        dialog.transient(self.control_panel)
-        # Remove dialog.grab_set() to make it non-modal so analysis can proceed
-        
-        # Set dialog size and position - make it larger for new buttons
-        dialog_width = 700
-        dialog_height = 500
-        screen_width = dialog.winfo_screenwidth()
-        screen_height = dialog.winfo_screenheight()
-        x = (screen_width - dialog_width) // 2
-        y = (screen_height - dialog_height) // 2
-        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
-        
-        # Title
-        title = ttk.Label(
-            dialog,
-            text=f"Comparison: {self.original_template_name}",
-            font=('Arial', 14, 'bold')
-        )
-        title.pack(pady=10)
-        
-        # Create comparison table
-        comparison_frame = ttk.Frame(dialog)
-        comparison_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Headers
-        headers_frame = ttk.Frame(comparison_frame)
-        headers_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Label(headers_frame, text="Sample", width=8, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Parameter", width=12, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Original", width=15, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Current", width=15, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Changed", width=8, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        
-        # Scrollable comparison list
-        canvas = tk.Canvas(comparison_frame)
-        scrollbar = ttk.Scrollbar(comparison_frame, orient=tk.VERTICAL, command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Populate comparison data
-        for i, (original, current) in enumerate(zip(self.original_parameters, self.current_parameters)):
-            sample_num = i + 1
-            
-            # Shape comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Shape", 
-                                   original.shape, current.shape)
-            
-            # Width comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Width", 
-                                   f"{original.width:.1f}", f"{current.width:.1f}")
-            
-            # Height comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Height", 
-                                   f"{original.height:.1f}", f"{current.height:.1f}")
-            
-            # Anchor comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Anchor", 
-                                   original.anchor, current.anchor)
-        
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Add analysis status info
-        status_frame = ttk.LabelFrame(dialog, text="Next Steps")
-        status_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Check if analysis data exists for current template
-        has_analysis = self._check_analysis_exists()
-        
-        if has_analysis:
-            status_text = "✅ Analysis data found - you can view results or run new analysis"
-        else:
-            status_text = "ℹ️  No analysis data found - click 'Analyze Now' to perform color analysis"
-        
-        ttk.Label(
-            status_frame,
-            text=status_text,
-            wraplength=550,
-            justify=tk.LEFT
-        ).pack(padx=10, pady=5)
-        
-        # Buttons - reorganized for better workflow
-        button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        # Template action buttons (left side)
-        template_buttons = ttk.Frame(button_frame)
-        template_buttons.pack(side=tk.LEFT)
-        
-        def save_as_new():
-            # Don't destroy dialog - let user decide when to close
-            self.show_save_as_dialog()
-        
-        def revert():
-            self._revert_to_original()
-            # Update canvas to reflect reverted changes
-            if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                canvas = self.control_panel.main_app.canvas
-                if hasattr(canvas, '_redraw_all_coordinate_markers'):
-                    canvas._redraw_all_coordinate_markers()
-                    canvas.update_display()
-            dialog.destroy()
-        
-        ttk.Button(template_buttons, text="Save As New Template", command=save_as_new).pack(side=tk.LEFT, padx=2)
-        ttk.Button(template_buttons, text="Revert to Original", command=revert).pack(side=tk.LEFT, padx=2)
-        
-        # Analysis action buttons (center)
-        analysis_buttons = ttk.Frame(button_frame)
-        analysis_buttons.pack(side=tk.LEFT, padx=20)
-        
-        def analyze_now():
-            """Start color analysis with current template."""
-            print("DEBUG: Analyze Now button clicked from comparison dialog")
-            if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                if hasattr(self.control_panel.main_app, '_analyze_colors'):
-                    # Keep dialog open but minimize it during analysis
-                    dialog.iconify()
-                    self.control_panel.main_app._analyze_colors()
-                    # Restore dialog after analysis
-                    dialog.after(2000, lambda: dialog.deiconify())
-                else:
-                    messagebox.showwarning("Analysis Error", "Analysis function not available")
-            else:
-                messagebox.showwarning("Analysis Error", "Cannot access main application")
-        
-        def view_results():
-            """View existing analysis results."""
-            print("DEBUG: View Results button clicked from comparison dialog")
-            if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                if hasattr(self.control_panel.main_app, '_view_spreadsheet'):
-                    self.control_panel.main_app._view_spreadsheet()
-                else:
-                    messagebox.showwarning("View Error", "View function not available")
-            else:
-                messagebox.showwarning("View Error", "Cannot access main application")
-        
-        # Create analyze button with different styling based on availability
-        analyze_btn = ttk.Button(
-            analysis_buttons, 
-            text="🔍 Analyze Now", 
-            command=analyze_now
-        )
-        analyze_btn.pack(side=tk.LEFT, padx=2)
-        
-        if has_analysis:
-            view_btn = ttk.Button(
-                analysis_buttons, 
-                text="📊 View Results", 
-                command=view_results
-            )
-            view_btn.pack(side=tk.LEFT, padx=2)
-            
-            # Make Analyze button look different when analysis exists
-            analyze_btn.configure(text="🔍 Analyze Again")
-        
-        # Close button (right side)
-        ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
-    
-    def _add_comparison_row(self, parent, sample_num, param_name, original_val, current_val):
-        """Add a comparison row to the scrollable frame."""
-        row_frame = ttk.Frame(parent)
-        row_frame.pack(fill=tk.X, pady=1)
-        
-        is_changed = str(original_val) != str(current_val)
-        bg_color = "#ffe6e6" if is_changed else "white"
-        
-        ttk.Label(row_frame, text=str(sample_num), width=8).pack(side=tk.LEFT)
-        ttk.Label(row_frame, text=param_name, width=12).pack(side=tk.LEFT)
-        ttk.Label(row_frame, text=str(original_val), width=15).pack(side=tk.LEFT)
-        
-        current_label = ttk.Label(row_frame, text=str(current_val), width=15)
-        if is_changed:
-            current_label.configure(foreground='red', font=('Arial', 9, 'bold'))
-        current_label.pack(side=tk.LEFT)
-        
-        status_text = "✓" if is_changed else ""
-        status_color = "red" if is_changed else "green"
-        ttk.Label(row_frame, text=status_text, width=8, foreground=status_color).pack(side=tk.LEFT)
     
     def _revert_to_original(self) -> None:
         """Revert all parameters to original values."""
@@ -912,10 +675,6 @@ class TemplateProtectionManager:
             self.show_save_as_dialog()
             print("DEBUG: save_as_new completed")
         
-        def show_comparison():
-            self.show_before_after_comparison()
-            # Don't close dialog, let user decide after seeing comparison
-        
         def revert_changes():
             self._revert_to_original()
             result['proceed'] = True  # Proceed with analysis after reverting
@@ -929,24 +688,14 @@ class TemplateProtectionManager:
             result['proceed'] = False
             dialog.destroy()
         
-        # Row 1: Primary actions
-        row1 = ttk.Frame(button_frame)
-        row1.pack(fill=tk.X, pady=2)
-        
-        ttk.Button(row1, text="Save As New Template", 
+        # Reorganized button layout - single row
+        ttk.Button(button_frame, text="Save As New Template", 
                   command=save_as_new).pack(side=tk.LEFT, padx=5)
-        ttk.Button(row1, text="Revert Changes", 
+        ttk.Button(button_frame, text="Revert Changes", 
                   command=revert_changes).pack(side=tk.LEFT, padx=5)
-        
-        # Row 2: Secondary actions
-        row2 = ttk.Frame(button_frame)
-        row2.pack(fill=tk.X, pady=2)
-        
-        ttk.Button(row2, text="Show Comparison", 
-                  command=show_comparison).pack(side=tk.LEFT, padx=5)
-        ttk.Button(row2, text="Continue Analysis", 
+        ttk.Button(button_frame, text="Continue Analysis", 
                   command=continue_analysis).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(row2, text="Cancel", 
+        ttk.Button(button_frame, text="Cancel", 
                   command=cancel_analysis).pack(side=tk.RIGHT, padx=5)
         
         dialog.wait_window()
@@ -1027,240 +776,6 @@ class TemplateProtectionManager:
             print(f"DEBUG: Error saving modified template: {e}")
             return False
     
-    def show_before_after_comparison_non_modal(self) -> None:
-        """Show non-modal before/after comparison of template parameters.
-        
-        This version doesn't use grab_set() so other UI interactions can continue.
-        Ideal for post-save scenarios where user needs to perform analysis.
-        """
-        # Debug information
-        print(f"DEBUG: Non-modal comparison dialog - Protected: {self.is_protected}")
-        print(f"DEBUG: Original template: {self.original_template_name}")
-        print(f"DEBUG: Original params count: {len(self.original_parameters)}")
-        print(f"DEBUG: Current params count: {len(self.current_parameters)}")
-        
-        # Use saved comparison data if available (from recent save)
-        if hasattr(self, '_saved_comparison_data'):
-            print("DEBUG: Using saved comparison data from recent template save")
-            comparison_data = self._saved_comparison_data
-            original_template_name = comparison_data['original_template_name']
-            original_parameters = comparison_data['original_parameters']
-            current_parameters = comparison_data['current_parameters']
-            # Clear the saved data after use
-            delattr(self, '_saved_comparison_data')
-        elif self.is_protected and self.original_parameters:
-            print("DEBUG: Using current protection data")
-            original_template_name = self.original_template_name
-            original_parameters = self.original_parameters
-            current_parameters = self.current_parameters
-        else:
-            print("DEBUG: No comparison data available")
-            messagebox.showwarning("No Comparison Data", "No template protection data available for comparison.")
-            return
-        
-        dialog = tk.Toplevel(self.control_panel)
-        dialog.title("Template Comparison")
-        dialog.transient(self.control_panel)
-        # Deliberately NOT using dialog.grab_set() to keep it non-modal
-        
-        # Set dialog size and position - make it larger for new buttons
-        dialog_width = 700
-        dialog_height = 500
-        screen_width = dialog.winfo_screenwidth()
-        screen_height = dialog.winfo_screenheight()
-        x = (screen_width - dialog_width) // 2
-        y = (screen_height - dialog_height) // 2
-        dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
-        
-        # Make dialog stay on top but not modal
-        dialog.attributes('-topmost', True)
-        
-        # Title
-        title = ttk.Label(
-            dialog,
-            text=f"Comparison: {original_template_name}",
-            font=('Arial', 14, 'bold')
-        )
-        title.pack(pady=10)
-        
-        # Create comparison table
-        comparison_frame = ttk.Frame(dialog)
-        comparison_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        # Headers
-        headers_frame = ttk.Frame(comparison_frame)
-        headers_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Label(headers_frame, text="Sample", width=8, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Parameter", width=12, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Original", width=15, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Current", width=15, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(headers_frame, text="Changed", width=8, font=('Arial', 10, 'bold')).pack(side=tk.LEFT)
-        
-        # Scrollable comparison list
-        canvas = tk.Canvas(comparison_frame)
-        scrollbar = ttk.Scrollbar(comparison_frame, orient=tk.VERTICAL, command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Populate comparison data
-        for i, (original, current) in enumerate(zip(original_parameters, current_parameters)):
-            sample_num = i + 1
-            
-            # Shape comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Shape", 
-                                   original.shape, current.shape)
-            
-            # Width comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Width", 
-                                   f"{original.width:.1f}", f"{current.width:.1f}")
-            
-            # Height comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Height", 
-                                   f"{original.height:.1f}", f"{current.height:.1f}")
-            
-            # Anchor comparison
-            self._add_comparison_row(scrollable_frame, sample_num, "Anchor", 
-                                   original.anchor, current.anchor)
-        
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # Add analysis status info
-        status_frame = ttk.LabelFrame(dialog, text="Next Steps")
-        status_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Check if analysis data exists for current template
-        has_analysis = self._check_analysis_exists()
-        
-        if has_analysis:
-            status_text = "✅ Analysis data found - you can view results or run new analysis"
-        else:
-            status_text = "ℹ️  No analysis data found - click 'Analyze Now' to perform color analysis"
-        
-        ttk.Label(
-            status_frame,
-            text=status_text,
-            wraplength=550,
-            justify=tk.LEFT
-        ).pack(padx=10, pady=5)
-        
-        # Buttons - simplified for non-modal use
-        button_frame = ttk.Frame(dialog)
-        button_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        # Analysis action buttons (center)
-        analysis_buttons = ttk.Frame(button_frame)
-        analysis_buttons.pack(side=tk.LEFT, padx=20)
-        
-        def analyze_now():
-            """Start color analysis with current template."""
-            print("DEBUG: Analyze Now button clicked from non-modal comparison dialog")
-            if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                if hasattr(self.control_panel.main_app, '_analyze_colors'):
-                    # No need to minimize dialog - it's non-modal so analysis can run alongside
-                    self.control_panel.main_app._analyze_colors()
-                else:
-                    messagebox.showwarning("Analysis Error", "Analysis function not available")
-            else:
-                messagebox.showwarning("Analysis Error", "Cannot access main application")
-        
-        def view_results():
-            """View existing analysis results."""
-            print("DEBUG: View Results button clicked from non-modal comparison dialog")
-            if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                if hasattr(self.control_panel.main_app, '_view_spreadsheet'):
-                    self.control_panel.main_app._view_spreadsheet()
-                else:
-                    messagebox.showwarning("View Error", "View function not available")
-            else:
-                messagebox.showwarning("View Error", "Cannot access main application")
-        
-        # Create analyze button with different styling based on availability
-        analyze_btn = ttk.Button(
-            analysis_buttons, 
-            text="🔍 Analyze Now", 
-            command=analyze_now
-        )
-        analyze_btn.pack(side=tk.LEFT, padx=2)
-        
-        if has_analysis:
-            view_btn = ttk.Button(
-                analysis_buttons, 
-                text="📊 View Results", 
-                command=view_results
-            )
-            view_btn.pack(side=tk.LEFT, padx=2)
-            
-            # Make Analyze button look different when analysis exists
-            analyze_btn.configure(text="🔍 Analyze Again")
-        
-        # Close button (right side)
-        ttk.Button(button_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
-        
-        # Add info about non-modal nature
-        info_frame = ttk.Frame(dialog)
-        info_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
-        
-        info_label = ttk.Label(
-            info_frame,
-            text="💡 This dialog remains open while you work - you can analyze, view results, or continue using the app",
-            font=('Arial', 9),
-            foreground='blue'
-        )
-        info_label.pack()
-        
-        print("DEBUG: Non-modal comparison dialog displayed successfully")
-    
-    def _check_analysis_exists(self) -> bool:
-        """Check if analysis data exists for the current template.
-        
-        Returns:
-            True if analysis data exists, False otherwise
-        """
-        try:
-            # Get current template name
-            template_name = self.control_panel.sample_set_name.get().strip()
-            if not template_name:
-                return False
-            
-            # Check if color analysis database exists for this template
-            from utils.color_analysis_db import ColorAnalysisDB
-            import os
-            
-            # Get the color analysis data directory
-            stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
-            if stampz_data_dir:
-                color_data_dir = os.path.join(stampz_data_dir, "data", "color_analysis")
-            else:
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                color_data_dir = os.path.join(current_dir, "data", "color_analysis")
-            
-            if not os.path.exists(color_data_dir):
-                return False
-            
-            # Check if database exists for this template
-            existing_analysis_dbs = ColorAnalysisDB.get_all_sample_set_databases(color_data_dir)
-            
-            # Check both original name and standardized name
-            from utils.naming_utils import standardize_name
-            standardized_name = standardize_name(template_name)
-            
-            has_data = template_name in existing_analysis_dbs or standardized_name in existing_analysis_dbs
-            
-            print(f"DEBUG: Analysis check for '{template_name}' (standardized: '{standardized_name}'): {has_data}")
-            return has_data
-            
-        except Exception as e:
-            print(f"DEBUG: Error checking analysis existence: {e}")
-            return False
     
     def handle_protected_save(self) -> bool:
         """Handle save attempt on protected template. Returns True if save should proceed."""
