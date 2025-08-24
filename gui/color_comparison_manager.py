@@ -991,15 +991,28 @@ class ColorComparisonManager(tk.Frame):
                 container.grid_columnconfigure(1, weight=0)  # Color name - fixed width
                 container.grid_columnconfigure(2, weight=0)  # Color swatch - fixed width
                 
-                # Color values with ΔE (left-aligned)
+                # Color values with ΔE (left-aligned) - split for bold ΔE
                 lab = match.library_color.lab
                 rgb = match.library_color.rgb
-                value_text = (f"L*: {lab[0]:.1f}  a*: {lab[1]:.1f}  b*: {lab[2]:.1f}    ΔE: {match.delta_e_2000:.2f}\n" +
-                             f"R: {int(rgb[0])}  G: {int(rgb[1])}  B: {int(rgb[2])}")
                 
-                # Create lab/rgb values label - left aligned
-                values_label = ttk.Label(container, text=value_text, font=("Arial", 12), anchor="w")
-                values_label.grid(row=0, column=0, padx=(20, 5), pady=2, sticky="w")
+                # Create a sub-frame for the values column to hold multiple labels
+                values_frame = ttk.Frame(container)
+                values_frame.grid(row=0, column=0, padx=(20, 5), pady=2, sticky="w")
+                
+                # Top row: L*, a*, b* values (normal font)
+                lab_text = f"L*: {lab[0]:.1f}  a*: {lab[1]:.1f}  b*: {lab[2]:.1f}    "
+                lab_label = ttk.Label(values_frame, text=lab_text, font=("Arial", 12), anchor="w")
+                lab_label.grid(row=0, column=0, sticky="w")
+                
+                # ΔE value (bold font) - placed next to lab values
+                delta_e_text = f"ΔE: {match.delta_e_2000:.2f}"
+                delta_e_label = ttk.Label(values_frame, text=delta_e_text, font=("Arial", 12, "bold"), anchor="w")
+                delta_e_label.grid(row=0, column=1, sticky="w")
+                
+                # Bottom row: RGB values (normal font)
+                rgb_text = f"R: {int(rgb[0])}  G: {int(rgb[1])}  B: {int(rgb[2])}"
+                rgb_label = ttk.Label(values_frame, text=rgb_text, font=("Arial", 12), anchor="w")
+                rgb_label.grid(row=1, column=0, columnspan=2, sticky="w")
                 
                 # Create separate color name label - left aligned
                 name_text = match.library_color.name
