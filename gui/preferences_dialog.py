@@ -37,11 +37,11 @@ class PreferencesDialog:
         
         # Calculate dialog size based on screen size, leaving space for dock/taskbar
         if screen_height <= 768:  # Small screens (laptops)
-            dialog_height = min(650, int(screen_height * 0.85))  # Much taller for small screens
+            dialog_height = min(700, int(screen_height * 0.90))  # Much taller for small screens
         else:  # Larger screens
-            dialog_height = min(800, int(screen_height * 0.90))  # Much taller for large screens
+            dialog_height = min(850, int(screen_height * 0.90))  # Much taller for large screens
         
-        dialog_width = min(750, int(screen_width * 0.65))  # Slightly wider
+        dialog_width = min(800, int(screen_width * 0.70))  # Wider to accommodate content
         
         # Wait for parent window to be fully initialized
         self.parent.update_idletasks()
@@ -318,6 +318,41 @@ class PreferencesDialog:
             font=("TkDefaultFont", 9),
             foreground="gray"
         ).pack(anchor=tk.W, pady=(5, 0))
+        
+        # Color space selection section
+        color_space_frame = ttk.LabelFrame(export_frame, text="Color Space Selection", padding="10")
+        color_space_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        ttk.Label(
+            color_space_frame,
+            text="Choose which color spaces to include in exports:",
+            font=("TkDefaultFont", 10, "bold")
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        self.export_include_rgb_var = tk.BooleanVar()
+        self.rgb_checkbox = ttk.Checkbutton(
+            color_space_frame,
+            text="Include RGB color values (Red, Green, Blue)",
+            variable=self.export_include_rgb_var,
+            command=self._on_color_space_change
+        )
+        self.rgb_checkbox.pack(anchor=tk.W, pady=(0, 5))
+        
+        self.export_include_lab_var = tk.BooleanVar()
+        self.lab_checkbox = ttk.Checkbutton(
+            color_space_frame,
+            text="Include L*a*b* color values (CIE L*a*b*)",
+            variable=self.export_include_lab_var,
+            command=self._on_color_space_change
+        )
+        self.lab_checkbox.pack(anchor=tk.W, pady=(0, 10))
+        
+        ttk.Label(
+            color_space_frame,
+            text="• RGB: Scanned image native format (0-255 per channel)\n• L*a*b*: Perceptually uniform color space, better for color analysis\n• Selecting only one color space reduces export column count\n• At least one color space must be selected",
+            font=("TkDefaultFont", 9),
+            foreground="gray"
+        ).pack(anchor=tk.W)
     
     def _create_file_dialog_tab(self, notebook):
         """Create the file dialog preferences tab."""
@@ -972,6 +1007,10 @@ class PreferencesDialog:
         self.sample_height_var.set(str(self.prefs_manager.get_default_sample_height()))
         self.sample_anchor_var.set(self.prefs_manager.get_default_sample_anchor())
         
+        # Color space preferences
+        self.export_include_rgb_var.set(self.prefs_manager.get_export_include_rgb())
+        self.export_include_lab_var.set(self.prefs_manager.get_export_include_lab())
+        
         # Update preview
         self._update_filename_preview()
     
@@ -1091,6 +1130,10 @@ class PreferencesDialog:
                 return False
             self.prefs_manager.set_default_sample_anchor(self.sample_anchor_var.get())
             
+            # Color space preferences
+            self.prefs_manager.set_export_include_rgb(self.export_include_rgb_var.get())
+            self.prefs_manager.set_export_include_lab(self.export_include_lab_var.get())
+            
             # Save preferences
             success = self.prefs_manager.save_preferences()
             
@@ -1130,6 +1173,21 @@ class PreferencesDialog:
     def _on_apply(self):
         """Handle Apply button."""
         self._apply_settings()
+    
+    def _on_color_space_change(self):
+        """Handle color space checkbox changes to ensure at least one is selected."""
+        rgb_checked = self.export_include_rgb_var.get()
+        lab_checked = self.export_include_lab_var.get()
+        
+        # Ensure at least one color space is selected
+        if not rgb_checked and not lab_checked:
+            # If both are unchecked, recheck the one that was just unchecked
+            # We can't tell which was just unchecked, so default to re-enabling RGB
+            self.export_include_rgb_var.set(True)
+            messagebox.showwarning(
+                "Color Space Required",
+                "At least one color space (RGB or L*a*b*) must be selected for exports.\n\nRGB has been re-enabled."
+            )
     
     def _on_cancel(self):
         """Handle Cancel button."""

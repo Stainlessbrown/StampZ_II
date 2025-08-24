@@ -428,18 +428,63 @@ class ODSExporter:
         return f"{(ab_value + 128.0)/255.0:.4f}"
     
     def _get_export_headers(self, use_normalized: bool) -> List[str]:
-        """Get column headers based on normalization preference."""
-        if use_normalized:
-            return ["L*_norm", "a*_norm", "b*_norm", "Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor", 
-                   "R_norm", "G_norm", "B_norm", "DataID_2", "Date", "Notes", "Calculations", 
-                   "L*_avg_norm", "a*_avg_norm", "b*_avg_norm", "DataID", "R_avg_norm", "G_avg_norm", "B_avg_norm", "Analysis"]
-        else:
-            return ["L*", "a*", "b*", "Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor", 
-                   "R", "G", "B", "DataID_2", "Date", "Notes", "Calculations", 
-                   "L*_avg", "a*_avg", "b*_avg", "DataID", "R_avg", "G_avg", "B_avg", "Analysis"]
+        """Get column headers based on normalization and color space preferences."""
+        headers = []
+        
+        # Get color space preferences
+        include_rgb = True
+        include_lab = True
+        if self.prefs_manager:
+            include_rgb = self.prefs_manager.get_export_include_rgb()
+            include_lab = self.prefs_manager.get_export_include_lab()
+        
+        # Individual measurement columns
+        if include_lab:
+            if use_normalized:
+                headers.extend(["L*_norm", "a*_norm", "b*_norm"])
+            else:
+                headers.extend(["L*", "a*", "b*"])
+        
+        # Common columns
+        headers.extend(["Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor"])
+        
+        if include_rgb:
+            if use_normalized:
+                headers.extend(["R_norm", "G_norm", "B_norm"])
+            else:
+                headers.extend(["R", "G", "B"])
+        
+        # More common columns
+        headers.extend(["DataID_2", "Date", "Notes", "Calculations"])
+        
+        # Averaged values columns
+        if include_lab:
+            if use_normalized:
+                headers.extend(["L*_avg_norm", "a*_avg_norm", "b*_avg_norm"])
+            else:
+                headers.extend(["L*_avg", "a*_avg", "b*_avg"])
+        
+        headers.append("DataID")  # DataID for averaged data
+        
+        if include_rgb:
+            if use_normalized:
+                headers.extend(["R_avg_norm", "G_avg_norm", "B_avg_norm"])
+            else:
+                headers.extend(["R_avg", "G_avg", "B_avg"])
+        
+        headers.append("Analysis")  # Final column
+        
+        return headers
     
     def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
-        """Format measurement values based on normalization preference."""
+        """Format measurement values based on normalization and color space preferences."""
+        
+        # Get color space preferences
+        include_rgb = True
+        include_lab = True
+        if self.prefs_manager:
+            include_rgb = self.prefs_manager.get_export_include_rgb()
+            include_lab = self.prefs_manager.get_export_include_lab()
         
         # Get averaged values if they exist (stored as attributes)
         l_avg = getattr(measurement, 'l_avg', '')
@@ -450,76 +495,90 @@ class ODSExporter:
         rgb_b_avg = getattr(measurement, 'rgb_b_avg', '')
         avg_data_id = getattr(measurement, 'avg_data_id', '')
         
-        if use_normalized:
-            # Format averaged values with normalization if they exist
-            l_avg_norm = self._normalize_lab_l(l_avg) if l_avg != '' else ''
-            a_avg_norm = self._normalize_lab_ab(a_avg) if a_avg != '' else ''
-            b_avg_norm = self._normalize_lab_ab(b_avg) if b_avg != '' else ''
-            r_avg_norm = self._normalize_rgb(r_avg) if r_avg != '' else ''
-            g_avg_norm = self._normalize_rgb(g_avg) if g_avg != '' else ''
-            rgb_b_avg_norm = self._normalize_rgb(rgb_b_avg) if rgb_b_avg != '' else ''
-            
-            return [
-                self._normalize_lab_l(measurement.l_value),
-                self._normalize_lab_ab(measurement.a_value),
-                self._normalize_lab_ab(measurement.b_value),
-                measurement.data_id,  # Filename_Timestamp (individual sample ID)
-                f"{measurement.x_position:.1f}",
-                f"{measurement.y_position:.1f}",
-                measurement.sample_shape,
-                measurement.sample_size,
-                measurement.sample_anchor,
-                self._normalize_rgb(measurement.rgb_r),
-                self._normalize_rgb(measurement.rgb_g),
-                self._normalize_rgb(measurement.rgb_b),
-                measurement.data_id,  # Duplicate DataID column
-                measurement.measurement_date,
-                measurement.notes or '',
-                '',  # Calculations column
-                l_avg_norm,   # L*_avg_norm
-                a_avg_norm,   # a*_avg_norm
-                b_avg_norm,   # b*_avg_norm
-                avg_data_id,  # DataID (for averaged data - filename_timestamp without sample suffix)
-                r_avg_norm,   # R_avg_norm
-                g_avg_norm,   # G_avg_norm
-                rgb_b_avg_norm,  # B_avg_norm
-                ''   # Analysis column
-            ]
-        else:
-            # Format averaged values without normalization if they exist
-            l_avg_str = f"{l_avg:.2f}" if l_avg != '' else ''
-            a_avg_str = f"{a_avg:.2f}" if a_avg != '' else ''
-            b_avg_str = f"{b_avg:.2f}" if b_avg != '' else ''
-            r_avg_str = f"{r_avg:.2f}" if r_avg != '' else ''
-            g_avg_str = f"{g_avg:.2f}" if g_avg != '' else ''
-            rgb_b_avg_str = f"{rgb_b_avg:.2f}" if rgb_b_avg != '' else ''
-            
-            return [
-                f"{measurement.l_value:.2f}",
-                f"{measurement.a_value:.2f}",
-                f"{measurement.b_value:.2f}",
-                measurement.data_id,  # Filename_Timestamp (individual sample ID)
-                f"{measurement.x_position:.1f}",
-                f"{measurement.y_position:.1f}",
-                measurement.sample_shape,
-                measurement.sample_size,
-                measurement.sample_anchor,
-                f"{measurement.rgb_r:.2f}",
-                f"{measurement.rgb_g:.2f}",
-                f"{measurement.rgb_b:.2f}",
-                measurement.data_id,  # Duplicate DataID column
-                measurement.measurement_date,
-                measurement.notes or '',
-                '',  # Calculations column
-                l_avg_str,    # L*_avg
-                a_avg_str,    # a*_avg
-                b_avg_str,    # b*_avg
-                avg_data_id,  # DataID (for averaged data - filename_timestamp without sample suffix)
-                r_avg_str,    # R_avg
-                g_avg_str,    # G_avg
-                rgb_b_avg_str,   # B_avg
-                ''   # Analysis column
-            ]
+        # Build row data dynamically based on preferences
+        row_data = []
+        
+        # Individual measurement L*a*b* values
+        if include_lab:
+            if use_normalized:
+                row_data.extend([
+                    self._normalize_lab_l(measurement.l_value),
+                    self._normalize_lab_ab(measurement.a_value),
+                    self._normalize_lab_ab(measurement.b_value)
+                ])
+            else:
+                row_data.extend([
+                    f"{measurement.l_value:.2f}",
+                    f"{measurement.a_value:.2f}",
+                    f"{measurement.b_value:.2f}"
+                ])
+        
+        # Common columns
+        row_data.extend([
+            measurement.data_id,  # Filename_Timestamp (individual sample ID)
+            f"{measurement.x_position:.1f}",
+            f"{measurement.y_position:.1f}",
+            measurement.sample_shape,
+            measurement.sample_size,
+            measurement.sample_anchor
+        ])
+        
+        # Individual measurement RGB values
+        if include_rgb:
+            if use_normalized:
+                row_data.extend([
+                    self._normalize_rgb(measurement.rgb_r),
+                    self._normalize_rgb(measurement.rgb_g),
+                    self._normalize_rgb(measurement.rgb_b)
+                ])
+            else:
+                row_data.extend([
+                    f"{measurement.rgb_r:.2f}",
+                    f"{measurement.rgb_g:.2f}",
+                    f"{measurement.rgb_b:.2f}"
+                ])
+        
+        # More common columns
+        row_data.extend([
+            measurement.data_id,  # Duplicate DataID column
+            measurement.measurement_date,
+            measurement.notes or '',
+            ''  # Calculations column
+        ])
+        
+        # Averaged L*a*b* values
+        if include_lab:
+            if use_normalized:
+                l_avg_norm = self._normalize_lab_l(l_avg) if l_avg != '' else ''
+                a_avg_norm = self._normalize_lab_ab(a_avg) if a_avg != '' else ''
+                b_avg_norm = self._normalize_lab_ab(b_avg) if b_avg != '' else ''
+                row_data.extend([l_avg_norm, a_avg_norm, b_avg_norm])
+            else:
+                l_avg_str = f"{l_avg:.2f}" if l_avg != '' else ''
+                a_avg_str = f"{a_avg:.2f}" if a_avg != '' else ''
+                b_avg_str = f"{b_avg:.2f}" if b_avg != '' else ''
+                row_data.extend([l_avg_str, a_avg_str, b_avg_str])
+        
+        # DataID for averaged data
+        row_data.append(avg_data_id)
+        
+        # Averaged RGB values
+        if include_rgb:
+            if use_normalized:
+                r_avg_norm = self._normalize_rgb(r_avg) if r_avg != '' else ''
+                g_avg_norm = self._normalize_rgb(g_avg) if g_avg != '' else ''
+                rgb_b_avg_norm = self._normalize_rgb(rgb_b_avg) if rgb_b_avg != '' else ''
+                row_data.extend([r_avg_norm, g_avg_norm, rgb_b_avg_norm])
+            else:
+                r_avg_str = f"{r_avg:.2f}" if r_avg != '' else ''
+                g_avg_str = f"{g_avg:.2f}" if g_avg != '' else ''
+                rgb_b_avg_str = f"{rgb_b_avg:.2f}" if rgb_b_avg != '' else ''
+                row_data.extend([r_avg_str, g_avg_str, rgb_b_avg_str])
+        
+        # Final analysis column
+        row_data.append('')  # Analysis column
+        
+        return row_data
     
     def create_ods_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
         """Create an ODS document with the color measurements."""

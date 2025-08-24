@@ -5,7 +5,9 @@
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
     "preferred_export_format": "ods",
-    "export_normalized_values": false
+    "export_normalized_values": false,
+    "export_include_rgb": false,
+    "export_include_lab": true
   },
   "file_dialog_prefs": {
     "last_open_directory": "/Users/stanbrown/Desktop/Semeuse comparisons scans",

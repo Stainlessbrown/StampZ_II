@@ -723,25 +723,29 @@ class TemplateProtectionManager:
             
             print(f"DEBUG: Saving modified template '{template_name}' to coordinate database")
             
-            # Get current coordinate positions from the canvas/main app
-            current_coordinates = None
+            # Get current coordinate positions from the canvas markers
+            current_markers = None
             if hasattr(self.control_panel, 'main_app') and self.control_panel.main_app:
-                if hasattr(self.control_panel.main_app, 'coordinates'):
-                    current_coordinates = self.control_panel.main_app.coordinates
+                canvas = self.control_panel.main_app.canvas
+                if hasattr(canvas, '_coord_markers') and canvas._coord_markers:
+                    current_markers = canvas._coord_markers
             
-            # Create coordinate points from current parameters, preserving positions
+            # Create coordinate points from current parameters, preserving actual positions
             coordinates = []
             for i, params in enumerate(self.current_parameters):
                 # Convert parameters back to CoordinatePoint format
                 sample_type = SampleAreaType.CIRCLE if params.shape == 'circle' else SampleAreaType.RECTANGLE
                 sample_size = (params.width, params.height)
                 
-                # Preserve original coordinate positions if available
-                if current_coordinates and i < len(current_coordinates):
-                    x_pos = current_coordinates[i].x
-                    y_pos = current_coordinates[i].y
+                # Get actual coordinate positions from canvas markers
+                if current_markers and i < len(current_markers):
+                    marker = current_markers[i]
+                    # Use the image position from the marker, not canvas position
+                    x_pos, y_pos = marker['image_pos']
+                    print(f"DEBUG: Using actual marker position for coordinate {i+1}: ({x_pos}, {y_pos})")
                 else:
-                    # Fallback to dummy coordinates only if no current coordinates available
+                    # This should rarely happen - log as a warning
+                    print(f"WARNING: No marker found for coordinate {i+1}, using dummy position")
                     x_pos = 100 + i * 50
                     y_pos = 100 + i * 50
                 

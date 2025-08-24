@@ -20,6 +20,8 @@ class ExportPreferences:
     include_timestamp: bool = False  # Whether to include timestamp in filename
     preferred_export_format: str = "ods"  # Preferred export format: 'ods', 'xlsx', or 'csv'
     export_normalized_values: bool = False  # Export color values normalized to 0.0-1.0 range
+    export_include_rgb: bool = True  # Include RGB color values in export
+    export_include_lab: bool = True  # Include L*a*b* color values in export
 
 
 @dataclass
@@ -236,6 +238,47 @@ class PreferencesManager:
             return True
         except Exception as e:
             print(f"Error setting normalized export preference: {e}")
+            return False
+    
+    def get_export_include_rgb(self) -> bool:
+        """Get whether to include RGB color values in exports."""
+        return self.preferences.export_prefs.export_include_rgb
+    
+    def set_export_include_rgb(self, include_rgb: bool) -> bool:
+        """Set whether to include RGB color values in exports.
+        
+        Args:
+            include_rgb: True to include RGB values, False to exclude them
+        """
+        try:
+            self.preferences.export_prefs.export_include_rgb = include_rgb
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting RGB export preference: {e}")
+            return False
+    
+    def get_export_include_lab(self) -> bool:
+        """Get whether to include L*a*b* color values in exports."""
+        return self.preferences.export_prefs.export_include_lab
+    
+    def set_export_include_lab(self, include_lab: bool) -> bool:
+        """Set whether to include L*a*b* color values in exports.
+        
+        Args:
+            include_lab: True to include L*a*b* values, False to exclude them
+        """
+        try:
+            # Ensure at least one color space is always included
+            if not include_lab and not self.preferences.export_prefs.export_include_rgb:
+                print("Error: At least one color space (RGB or L*a*b*) must be included in exports")
+                return False
+            
+            self.preferences.export_prefs.export_include_lab = include_lab
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting L*a*b* export preference: {e}")
             return False
     
     def get_default_color_library(self) -> str:
@@ -457,7 +500,9 @@ class PreferencesManager:
                         export_filename_format=export_data.get('export_filename_format', '{sample_set}_{date}'),
                         include_timestamp=export_data.get('include_timestamp', False),
                         preferred_export_format=export_data.get('preferred_export_format', 'ods'),
-                        export_normalized_values=export_data.get('export_normalized_values', False)
+                        export_normalized_values=export_data.get('export_normalized_values', False),
+                        export_include_rgb=export_data.get('export_include_rgb', True),
+                        export_include_lab=export_data.get('export_include_lab', True)
                     )
                 
                 # Load file dialog preferences

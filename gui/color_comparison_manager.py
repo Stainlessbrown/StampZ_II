@@ -291,6 +291,27 @@ class ColorComparisonManager(tk.Frame):
         for widget in self.samples_frame.winfo_children():
             widget.destroy()
         
+        # Calculate average color for ΔE comparisons
+        enabled_samples = [s for s in self.sample_points if s['enabled'].get()]
+        average_lab = None
+        
+        if enabled_samples and self.library:
+            from utils.color_analyzer import ColorAnalyzer
+            analyzer = ColorAnalyzer()
+            
+            lab_values = []
+            rgb_values = []
+            for sample in enabled_samples:
+                rgb = sample['rgb']
+                lab = self.library.rgb_to_lab(rgb) if self.library else analyzer.rgb_to_lab(rgb)
+                lab_values.append(lab)
+                rgb_values.append(rgb)
+            
+            if lab_values:
+                # Calculate quality-controlled average for ΔE comparison
+                averaging_result = analyzer._calculate_quality_controlled_average(lab_values, rgb_values)
+                average_lab = averaging_result['avg_lab']
+        
         # Display each sample point
         for sample in self.sample_points:
             frame = ttk.Frame(self.samples_frame)
@@ -302,13 +323,20 @@ class ColorComparisonManager(tk.Frame):
                           variable=sample['enabled'],
                           command=self._on_sample_toggle).pack(side=tk.LEFT)
             
-            # Color values
+            # Color values with ΔE from average
             rgb = sample['rgb']
             lab = self.library.rgb_to_lab(rgb) if self.library else None
             
             if lab:
                 value_text = (f"L*: {lab[0]:>6.1f}  a*: {lab[1]:>6.1f}  b*: {lab[2]:>6.1f}\n" +
                              f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}")
+                
+                # Add ΔE from average if we have both values
+                if average_lab and sample['enabled'].get():
+                    from utils.color_analyzer import ColorAnalyzer
+                    analyzer = ColorAnalyzer()
+                    delta_e = analyzer.calculate_delta_e(lab, average_lab)
+                    value_text += f"\nΔE from avg: {delta_e:.2f}"
             else:
                 value_text = f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}"
             
@@ -344,14 +372,27 @@ class ColorComparisonManager(tk.Frame):
             ttk.Label(self.average_frame, text="No samples enabled").pack(pady=20)
             return
         
-        # Calculate average RGB
-        total_r = sum(s['rgb'][0] for s in enabled_samples)
-        total_g = sum(s['rgb'][1] for s in enabled_samples)
-        total_b = sum(s['rgb'][2] for s in enabled_samples)
-        count = len(enabled_samples)
+        # Use ColorAnalyzer for quality-controlled averaging with ΔE outlier detection
+        from utils.color_analyzer import ColorAnalyzer
+        analyzer = ColorAnalyzer()
         
-        avg_rgb = (total_r/count, total_g/count, total_b/count)
-        avg_lab = self.library.rgb_to_lab(avg_rgb) if self.library else None
+        # Convert samples to Lab and RGB lists for quality averaging
+        lab_values = []
+        rgb_values = []
+        for sample in enabled_samples:
+            rgb = sample['rgb']
+            lab = self.library.rgb_to_lab(rgb) if self.library else analyzer.rgb_to_lab(rgb)
+            lab_values.append(lab)
+            rgb_values.append(rgb)
+        
+        # Calculate quality-controlled average with ΔE outlier detection
+        averaging_result = analyzer._calculate_quality_controlled_average(lab_values, rgb_values)
+        
+        avg_rgb = averaging_result['avg_rgb']
+        avg_lab = averaging_result['avg_lab']
+        max_delta_e = averaging_result['max_delta_e']
+        samples_used = averaging_result['samples_used']
+        outliers_excluded = averaging_result['outliers_excluded']
         
         # Create display frame
         frame = ttk.Frame(self.average_frame)
@@ -388,8 +429,15 @@ class ColorComparisonManager(tk.Frame):
         # Add color values
         ttk.Label(values_frame, text=value_text, font=("Arial", 12)).pack(anchor='w')
         
+        # Add quality metrics with ΔE information
+        quality_text = f"Quality: ΔE max {max_delta_e:.2f}, {samples_used}/{len(enabled_samples)} samples used"
+        if outliers_excluded > 0:
+            quality_text += f", {outliers_excluded} outliers excluded"
+        
+        ttk.Label(values_frame, text=quality_text, font=("Arial", 10), foreground="#666666").pack(anchor='w', pady=(5, 0))
+        
         # Add some vertical space
-        ttk.Frame(values_frame, height=20).pack()
+        ttk.Frame(values_frame, height=15).pack()
         
         # Add the button at the bottom right of values_frame
         add_button = ttk.Button(values_frame, text="Add color to library", 
@@ -746,6 +794,9 @@ class ColorComparisonManager(tk.Frame):
     
     def _on_sample_toggle(self):
         """Handle sample toggle event."""
+        # Update both the average display and the individual sample displays
+        # so that ΔE values reflect the new average after sample selection changes
+        self._display_sample_points()
         self._update_average_display()
     
     def _load_available_libraries(self):

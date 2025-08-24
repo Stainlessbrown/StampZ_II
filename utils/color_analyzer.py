@@ -112,6 +112,126 @@ class ColorAnalyzer:
         
         return (L, a, b)
     
+    def calculate_delta_e(self, lab1: Tuple[float, float, float], 
+                         lab2: Tuple[float, float, float]) -> float:
+        """Calculate Delta E using CAM02-UCS (available) or CIE76 as fallback.
+        
+        Args:
+            lab1: First Lab color (L, a, b)
+            lab2: Second Lab color (L, a, b)
+            
+        Returns:
+            Delta E value (CAM02-UCS if colorspacious available, otherwise CIE76)
+        """
+        if HAS_COLORSPACIOUS:
+            try:
+                import numpy as np
+                from colorspacious import deltaE
+                lab1_array = np.array(lab1)
+                lab2_array = np.array(lab2)
+                return deltaE(lab1_array, lab2_array, input_space="CIELab", uniform_space="CAM02-UCS")
+            except ImportError:
+                # Fallback to CIE76 if numpy/colorspacious fails
+                return self._delta_e_76_approximation(lab1, lab2)
+        else:
+            return self._delta_e_76_approximation(lab1, lab2)
+    
+    def _delta_e_76_approximation(self, lab1: Tuple[float, float, float], 
+                                 lab2: Tuple[float, float, float]) -> float:
+        """Approximate CIE76 Delta E calculation (less accurate than Delta E 2000)."""
+        import math
+        l1, a1, b1 = lab1
+        l2, a2, b2 = lab2
+        
+        delta_l = l1 - l2
+        delta_a = a1 - a2
+        delta_b = b1 - b2
+        
+        return math.sqrt(delta_l**2 + delta_a**2 + delta_b**2)
+    
+    def _calculate_quality_controlled_average(
+        self, 
+        lab_values: List[Tuple[float, float, float]], 
+        rgb_values: List[Tuple[float, float, float]],
+        delta_e_threshold: float = 6.0
+    ) -> Dict[str, Any]:
+        """Calculate average with ΔE-based outlier detection for quality control.
+        
+        Args:
+            lab_values: List of Lab color tuples
+            rgb_values: List of RGB color tuples
+            delta_e_threshold: Threshold for outlier exclusion (default 6.0)
+            
+        Returns:
+            Dictionary with averaging results including quality metrics
+        """
+        if not lab_values or not rgb_values or len(lab_values) != len(rgb_values):
+            return {
+                'avg_lab': (50.0, 0.0, 0.0),
+                'avg_rgb': (128.0, 128.0, 128.0),
+                'max_delta_e': 0.0,
+                'samples_used': 0,
+                'outliers_excluded': 0
+            }
+        
+        # Calculate initial average to use as reference
+        initial_lab = (
+            sum(lab[0] for lab in lab_values) / len(lab_values),
+            sum(lab[1] for lab in lab_values) / len(lab_values),
+            sum(lab[2] for lab in lab_values) / len(lab_values)
+        )
+        
+        # Calculate ΔE from each sample to the initial average
+        delta_e_values = []
+        for lab in lab_values:
+            delta_e = self.calculate_delta_e(lab, initial_lab)
+            delta_e_values.append(delta_e)
+        
+        # Identify outliers based on ΔE threshold
+        outlier_indices = set()
+        for i, delta_e in enumerate(delta_e_values):
+            if delta_e > delta_e_threshold:
+                outlier_indices.add(i)
+        
+        # Filter out outliers
+        filtered_lab = [lab for i, lab in enumerate(lab_values) if i not in outlier_indices]
+        filtered_rgb = [rgb for i, rgb in enumerate(rgb_values) if i not in outlier_indices]
+        
+        # If all samples are outliers, use all samples (avoid empty result)
+        if not filtered_lab:
+            filtered_lab = lab_values
+            filtered_rgb = rgb_values
+            outlier_indices = set()
+        
+        # Calculate final averages from filtered samples
+        avg_lab = (
+            sum(lab[0] for lab in filtered_lab) / len(filtered_lab),
+            sum(lab[1] for lab in filtered_lab) / len(filtered_lab),
+            sum(lab[2] for lab in filtered_lab) / len(filtered_lab)
+        )
+        
+        avg_rgb = (
+            sum(rgb[0] for rgb in filtered_rgb) / len(filtered_rgb),
+            sum(rgb[1] for rgb in filtered_rgb) / len(filtered_rgb),
+            sum(rgb[2] for rgb in filtered_rgb) / len(filtered_rgb)
+        )
+        
+        # Calculate quality metrics from final filtered samples
+        final_delta_e_values = []
+        for lab in filtered_lab:
+            delta_e = self.calculate_delta_e(lab, avg_lab)
+            final_delta_e_values.append(delta_e)
+        
+        max_delta_e = max(final_delta_e_values) if final_delta_e_values else 0.0
+        
+        return {
+            'avg_lab': avg_lab,
+            'avg_rgb': avg_rgb,
+            'max_delta_e': max_delta_e,
+            'samples_used': len(filtered_lab),
+            'outliers_excluded': len(outlier_indices)
+        }
+    
     def extract_sample_colors(self, image: Image.Image, coordinate_set_name: str) -> List[ColorMeasurement]:
         """Extract colors from all sample areas in a coordinate set.
         
@@ -782,17 +902,24 @@ class ColorAnalyzer:
                 lab_values.append(lab)
                 rgb_values.append(rgb)
             
-            # Calculate averages
-            avg_lab = (
-                sum(lab[0] for lab in lab_values) / len(lab_values),
-                sum(lab[1] for lab in lab_values) / len(lab_values),
-                sum(lab[2] for lab in lab_values) / len(lab_values)
-            )
-            avg_rgb = (
-                sum(rgb[0] for rgb in rgb_values) / len(rgb_values),
-                sum(rgb[1] for rgb in rgb_values) / len(rgb_values),
-                sum(rgb[2] for rgb in rgb_values) / len(rgb_values)
-            )
+            # Perform ΔE-based outlier detection and quality-controlled averaging
+            averaging_result = self._calculate_quality_controlled_average(lab_values, rgb_values)
+            
+            avg_lab = averaging_result['avg_lab']
+            avg_rgb = averaging_result['avg_rgb']
+            max_delta_e = averaging_result['max_delta_e']
+            samples_used = averaging_result['samples_used']
+            outliers_excluded = averaging_result['outliers_excluded']
+            
+            # Update notes with quality information
+            quality_info = f"ΔE max: {max_delta_e:.2f}, used {samples_used}/{len(sample_measurements)} samples"
+            if outliers_excluded > 0:
+                quality_info += f", {outliers_excluded} outliers excluded"
+            
+            if notes:
+                notes = f"{notes} | {quality_info}"
+            else:
+                notes = quality_info
             
             # Create color analysis database instance
             from .color_analysis_db import ColorAnalysisDB
