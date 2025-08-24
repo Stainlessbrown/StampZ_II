@@ -95,7 +95,7 @@ class DatabaseViewer:
         self.sort_combo.pack(side=tk.LEFT, padx=(0, 5))
         self.sort_combo.set('Date')
         
-        self.sort_order = tk.BooleanVar(value=True)  # True = ascending
+        self.sort_order = tk.BooleanVar(value=False)  # False = descending (newest first)
         ttk.Radiobutton(filter_frame, text="Asc", variable=self.sort_order, value=True, command=self._apply_sort).pack(side=tk.LEFT)
         ttk.Radiobutton(filter_frame, text="Desc", variable=self.sort_order, value=False, command=self._apply_sort).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -324,11 +324,21 @@ class DatabaseViewer:
                     # Map data to correct columns based on column definitions
                     # columns = ["set_id", "image_name", "measurement_date", "point", "l_value", "a_value", "b_value",
                     #           "rgb_r", "rgb_g", "rgb_b", "x_pos", "y_pos", "shape", "size", "notes"]
+                    # Check if this is an averaged measurement and format point display accordingly
+                    coordinate_point = measurement.get('coordinate_point', '')
+                    is_averaged = measurement.get('is_averaged', False)
+                    
+                    # Format the point column to show "AVERAGE" instead of "999"
+                    if coordinate_point == 999 or is_averaged:
+                        point_display = "AVERAGE"
+                    else:
+                        point_display = str(coordinate_point)
+                    
                     values = [
                         measurement.get('set_id', ''),           # set_id column
                         measurement.get('image_name', ''),       # image_name column 
                         measurement.get('measurement_date', ''), # measurement_date column
-                        measurement.get('coordinate_point', ''), # point column
+                        point_display,                           # point column - show "AVERAGE" for 999/averaged
                         f"{measurement.get('l_value', 0):.2f}",  # l_value column
                         f"{measurement.get('a_value', 0):.2f}",  # a_value column
                         f"{measurement.get('b_value', 0):.2f}",  # b_value column
@@ -337,8 +347,8 @@ class DatabaseViewer:
                         f"{measurement.get('rgb_b', 0):.2f}",    # rgb_b column
                         f"{measurement.get('x_position', 0):.1f}", # x_pos column
                         f"{measurement.get('y_position', 0):.1f}", # y_pos column
-                        '',  # shape placeholder
-                        '',  # size placeholder
+                        measurement.get('sample_type', ''),      # shape column
+                        measurement.get('sample_size', ''),      # size column
                         measurement.get('notes', '')             # notes column
                     ]
                     # Use measurement ID as the item ID for easier deletion

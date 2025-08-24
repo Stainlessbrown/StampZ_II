@@ -17,5 +17,11 @@
   },
   "interface_prefs": {
     "interface_mode": "basic"
+  },
+  "sample_area_prefs": {
+    "default_shape": "circle",
+    "default_width": 10,
+    "default_height": 10,
+    "default_anchor": "center"
   }
 }

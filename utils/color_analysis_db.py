@@ -301,6 +301,36 @@ class ColorAnalysisDB:
                 if notes:
                     avg_notes += f": {notes}"
                 
+                # Analyze sample parameters from source measurements
+                sample_types = [m.get('sample_type', '') for m in source_measurements if m.get('sample_type')]
+                sample_sizes = [m.get('sample_size', '') for m in source_measurements if m.get('sample_size')]
+                sample_anchors = [m.get('sample_anchor', '') for m in source_measurements if m.get('sample_anchor')]
+                
+                # Determine aggregated values
+                if sample_types:
+                    unique_types = set(sample_types)
+                    avg_sample_type = sample_types[0] if len(unique_types) == 1 else 'various'
+                else:
+                    unique_types = set()
+                    avg_sample_type = 'unknown'
+                
+                if sample_sizes:
+                    unique_sizes = set(sample_sizes)
+                    avg_sample_size = sample_sizes[0] if len(unique_sizes) == 1 else 'various'
+                else:
+                    unique_sizes = set()
+                    avg_sample_size = 'unknown'
+                
+                if sample_anchors:
+                    unique_anchors = set(sample_anchors)
+                    avg_sample_anchor = sample_anchors[0] if len(unique_anchors) == 1 else 'various'
+                else:
+                    unique_anchors = set()
+                    avg_sample_anchor = 'unknown'
+                
+                print(f"DEBUG: Averaging sample parameters - types: {unique_types}, sizes: {unique_sizes}, anchors: {unique_anchors}")
+                print(f"DEBUG: Result - type: {avg_sample_type}, size: {avg_sample_size}, anchor: {avg_sample_anchor}")
+                
                 # Insert averaged measurement
                 conn.execute("""
                     INSERT INTO color_measurements (
@@ -313,7 +343,7 @@ class ColorAnalysisDB:
                     set_id, coordinate_point, avg_x, avg_y,
                     averaged_lab[0], averaged_lab[1], averaged_lab[2],
                     averaged_rgb[0], averaged_rgb[1], averaged_rgb[2],
-                    'averaged', 'multiple', 'center', avg_notes,
+                    avg_sample_type, avg_sample_size, avg_sample_anchor, avg_notes,
                     1, len(source_measurements), source_ids
                 ))
                 
@@ -338,6 +368,7 @@ class ColorAnalysisDB:
                         m.coordinate_point, m.x_position, m.y_position,
                         m.l_value, m.a_value, m.b_value, 
                         m.rgb_r, m.rgb_g, m.rgb_b,
+                        m.sample_type, m.sample_size, m.sample_anchor,
                         m.notes, m.is_averaged, m.source_samples_count, m.source_sample_ids
                     FROM color_measurements m
                     JOIN measurement_sets s ON m.set_id = s.set_id
@@ -360,10 +391,13 @@ class ColorAnalysisDB:
                         'rgb_r': row[10],
                         'rgb_g': row[11],
                         'rgb_b': row[12],
-                        'notes': row[13],
-                        'is_averaged': bool(row[14]) if row[14] is not None else False,
-                        'source_samples_count': row[15],
-                        'source_sample_ids': row[16]
+                        'sample_type': row[13],
+                        'sample_size': row[14],
+                        'sample_anchor': row[15],
+                        'notes': row[16],
+                        'is_averaged': bool(row[17]) if row[17] is not None else False,
+                        'source_samples_count': row[18],
+                        'source_sample_ids': row[19]
                     })
                 
                 return measurements

@@ -711,9 +711,17 @@ class StampZApp:
             print(f"DEBUG: Database save result: success={success}, standardized_name={standardized_name}")
 
             if success:
+                # Update the template name in control panel to the standardized name
+                self.control_panel.sample_set_name.set(standardized_name)
+                
+                # Protect the newly saved template
+                print(f"DEBUG: Protecting newly saved template '{standardized_name}'")
+                self.control_panel.template_protection.protect_template(standardized_name, coordinates)
+                
                 messagebox.showinfo(
                     "Success",
-                    f"Successfully saved {len(coordinates)} sample points to set '{standardized_name}'."
+                    f"Successfully saved {len(coordinates)} sample points to set '{standardized_name}'.\n\n"
+                    f"Template is now protected from accidental modification."
                 )
             else:
                 messagebox.showerror(

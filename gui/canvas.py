@@ -1030,22 +1030,87 @@ class CropCanvas(tk.Canvas):
                     )
     
     # Coordinate marker methods (simplified)
-    def _redraw_all_coordinate_markers(self) -> None:
-        """Redraw all coordinate markers."""
-        # Clear existing coordinate markers
-        self.delete("coord_marker")
+    def clear_coordinate_markers(self) -> None:
+        """Clear all coordinate markers from the canvas and internal list."""
+        # Clear visual markers from canvas
+        for marker in self._coord_markers:
+            if 'tag' in marker:
+                self.delete(marker['tag'])
         
-        # Redraw all markers with updated coordinates
+        # Clear the internal markers list
+        self._coord_markers.clear()
+        
+        # Also clear any preview markers
+        self.delete("coord_preview")
+        self.delete("preview_marker")
+        
+        print("DEBUG: Cleared all coordinate markers")
+    
+    def draw_coordinate_markers(self) -> None:
+        """Draw coordinate markers from main app coordinates."""
+        if not hasattr(self, 'main_app') or not self.main_app:
+            print("DEBUG: No main app reference for drawing coordinate markers")
+            return
+            
+        if not hasattr(self.main_app, 'coordinates') or not self.main_app.coordinates:
+            print("DEBUG: No coordinates available in main app")
+            return
+        
+        print(f"DEBUG: Drawing {len(self.main_app.coordinates)} coordinate markers from main app")
+        
+        # Clear existing markers first
+        self.clear_coordinate_markers()
+        
+        # Convert main app coordinates to canvas markers
+        for i, coord in enumerate(self.main_app.coordinates):
+            from utils.coordinate_db import SampleAreaType
+            
+            marker = {
+                "index": i + 1,
+                "image_pos": (coord.x, coord.y),
+                "sample_type": "circle" if coord.sample_type == SampleAreaType.CIRCLE else "rectangle",
+                "sample_width": coord.sample_size[0],
+                "sample_height": coord.sample_size[1],
+                "anchor": coord.anchor_position,
+                "is_preview": False,
+                "tag": f"coord_marker_{i + 1}"
+            }
+            
+            # Add to internal list
+            self._coord_markers.append(marker)
+            
+            # Draw the marker
+            self._draw_coordinate_marker(marker)
+            
+            print(f"DEBUG: Drew marker {i + 1} at ({coord.x:.1f}, {coord.y:.1f}) type={marker['sample_type']}")
+    
+    def _redraw_all_coordinate_markers(self) -> None:
+        """Redraw all coordinate markers with updated parameters."""
+        print(f"DEBUG: _redraw_all_coordinate_markers called with {len(self._coord_markers)} markers")
+        
+        # Clear existing visual markers first
+        for marker in self._coord_markers:
+            if 'tag' in marker:
+                self.delete(marker['tag'])
+                print(f"DEBUG: Cleared visual marker with tag {marker['tag']}")
+        
+        # Redraw all markers with updated parameters
         for i, marker in enumerate(self._coord_markers):
             try:
                 image_x, image_y = marker['image_pos']
                 screen_x, screen_y = self.core.image_to_screen_coords(image_x, image_y)
                 marker['screen_pos'] = (screen_x, screen_y)
                 
-                # Actually draw the marker at the new position
+                # Update tag for uniqueness
+                marker['tag'] = f"coord_marker_{i + 1}_updated"
+                
+                # Draw the marker with updated parameters
                 self._draw_coordinate_marker(marker)
+                print(f"DEBUG: Redrawn marker {i + 1}: {marker['sample_type']} {marker['sample_width']}x{marker['sample_height']} at ({image_x:.1f}, {image_y:.1f})")
             except Exception as e:
-                logger.error(f"Error redrawing marker {i}: {e}")
+                print(f"ERROR: Error redrawing marker {i}: {e}")
+                import traceback
+                traceback.print_exc()
     
     # Straightening visualization
     def _draw_straightening_points(self) -> None:

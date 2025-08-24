@@ -15,6 +15,7 @@ from utils.image_processor import load_image, ImageLoadError
 from utils.save_as import SaveOptions, SaveFormat
 from gui.canvas import ShapeType
 from utils.color_analyzer import PrintType
+from utils.template_protection import TemplateProtectionManager
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -63,6 +64,9 @@ class ReorganizedControlPanel(ttk.Frame):
         
         # Initialize main_app reference
         self.main_app = None
+        
+        # Initialize template protection manager
+        self.template_protection = TemplateProtectionManager(self)
         
         # Create the reorganized layout
         self._create_always_visible_section()
@@ -1002,6 +1006,21 @@ class ReorganizedControlPanel(ttk.Frame):
     def _analyze_colors(self):
         """Handle analyze colors button click."""
         print("DEBUG: _analyze_colors called")
+        
+        # Check template protection before proceeding with analysis
+        if hasattr(self, 'template_protection'):
+            print(f"DEBUG: Template protection exists - is_protected: {self.template_protection.is_protected}")
+            print(f"DEBUG: Template protection - has_modifications: {self.template_protection.has_modifications()}")
+            print(f"DEBUG: Template protection - original_template_name: '{self.template_protection.original_template_name}'")
+            
+            if not self.template_protection.check_before_analyze():
+                print("DEBUG: Analysis blocked by template protection")
+                return
+            else:
+                print("DEBUG: Template protection check passed - proceeding with analysis")
+        else:
+            print("DEBUG: No template protection manager found")
+        
         if hasattr(self, 'main_app') and self.main_app:
             if hasattr(self.main_app, '_analyze_colors'):
                 print("DEBUG: Calling main_app._analyze_colors()")
@@ -1134,6 +1153,12 @@ class ReorganizedControlPanel(ttk.Frame):
                 control['anchor'].set(coord.anchor_position)
                 
                 print(f"DEBUG: Updated sample {i+1}: {shape_type} {coord.sample_size[0]}x{coord.sample_size[1]} {coord.anchor_position}")
+        
+        # After updating controls, protect the loaded template
+        template_name = self.sample_set_name.get().strip()
+        if template_name and template_name != "MAN_MODE":
+            print(f"DEBUG: Protecting loaded template '{template_name}'")
+            self.template_protection.protect_template(template_name, coordinates)
     
     # Sample tool callback methods
     def _standardize_template_name(self, event=None):
@@ -1175,8 +1200,14 @@ class ReorganizedControlPanel(ttk.Frame):
             messagebox.showinfo("Info", "Edit sample - connect to main app implementation")
     
     def _save_sample_set(self):
-        """Save sample set template."""
+        """Save sample set template with protection logic."""
         print("DEBUG: _save_sample_set() called in controls_reorganized.py")
+        
+        # Check template protection first
+        if not self.template_protection.handle_protected_save():
+            print("DEBUG: Save cancelled due to template protection")
+            return
+        
         print(f"DEBUG: hasattr(self, 'main_app') = {hasattr(self, 'main_app')}")
         if hasattr(self, 'main_app'):
             print(f"DEBUG: self.main_app = {self.main_app}")
@@ -1434,8 +1465,12 @@ class ReorganizedControlPanel(ttk.Frame):
             print(f"DEBUG: Error getting sample sets: {e}")
             return []  # Return empty list if there's an error
     
-    def _refresh_sample_sets(self):
-        """Refresh the sample set dropdown with current database contents."""
+    def _refresh_sample_sets(self, show_feedback=True):
+        """Refresh the sample set dropdown with current database contents.
+        
+        Args:
+            show_feedback: Whether to show user feedback dialogs
+        """
         try:
             # Get updated list of sample sets
             updated_sets = self._get_available_sample_sets()
@@ -1443,27 +1478,29 @@ class ReorganizedControlPanel(ttk.Frame):
             # Update the combobox values
             self.sample_set_combo['values'] = updated_sets
             
-            # Show feedback to user
-            if updated_sets:
-                messagebox.showinfo(
-                    "Sample Sets Refreshed", 
-                    f"Found {len(updated_sets)} sample sets:\n\n" + "\n".join(updated_sets[:10]) +
-                    ("\n...and more" if len(updated_sets) > 10 else "")
-                )
-            else:
-                messagebox.showinfo(
-                    "Sample Sets Refreshed", 
-                    "No existing sample sets found.\nCreate a new one by entering a name and saving."
-                )
+            # Show feedback to user if requested
+            if show_feedback:
+                if updated_sets:
+                    messagebox.showinfo(
+                        "Sample Sets Refreshed", 
+                        f"Found {len(updated_sets)} sample sets:\n\n" + "\n".join(updated_sets[:10]) +
+                        ("\n...and more" if len(updated_sets) > 10 else "")
+                    )
+                else:
+                    messagebox.showinfo(
+                        "Sample Sets Refreshed", 
+                        "No existing sample sets found.\nCreate a new one by entering a name and saving."
+                    )
             
-            print(f"DEBUG: Refreshed sample set dropdown with {len(updated_sets)} sets")
+            print(f"DEBUG: Refreshed sample set dropdown with {len(updated_sets)} sets (feedback: {show_feedback})")
             
         except Exception as e:
             print(f"DEBUG: Error refreshing sample sets: {e}")
-            messagebox.showerror(
-                "Refresh Error", 
-                f"Could not refresh sample set list:\n\n{str(e)}"
-            )
+            if show_feedback:
+                messagebox.showerror(
+                    "Refresh Error", 
+                    f"Could not refresh sample set list:\n\n{str(e)}"
+                )
     
     def _add_analysis_to_library(self):
         """Add color analysis results to a color library with user-friendly names."""

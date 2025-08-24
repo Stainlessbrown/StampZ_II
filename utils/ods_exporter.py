@@ -151,6 +151,11 @@ class ODSExporter:
                     individual_measurements = [m for m in all_measurements if not m.get('is_averaged', False)]
                     averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
                     
+                    # Filter out Point 999 measurements (these are averaged measurements that shouldn't appear in regular exports)
+                    individual_measurements = [m for m in individual_measurements if m.get('coordinate_point', 0) != 999]
+                    
+                    print(f"DEBUG ODSExporter: Filtered out Point 999 entries, now have {len(individual_measurements)} individual measurements")
+                    
                     print(f"DEBUG ODSExporter: Found {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
                     
                     # Calculate averaged values for this sample set (if any exist)
@@ -224,9 +229,19 @@ class ODSExporter:
                         coord_point = measurement['coordinate_point']
                         
                         # Try to get sample info from the measurement data itself
+                        sample_size_raw = measurement.get('sample_size', '20')
+                        # Handle both "20x20" format and single "20" format
+                        if sample_size_raw and 'x' in str(sample_size_raw):
+                            # Format like "20x20" - use just the first dimension for display
+                            size_parts = str(sample_size_raw).split('x')
+                            formatted_size = size_parts[0] if size_parts else '20'
+                        else:
+                            # Single dimension or fallback
+                            formatted_size = str(sample_size_raw) if sample_size_raw else '20'
+                        
                         coord_details = {
                             'shape': measurement.get('sample_type', 'circle'),  # Default to circle if None
-                            'size': measurement.get('sample_size', '20'),      # Default size if None
+                            'size': formatted_size,      # Properly formatted size
                             'anchor': measurement.get('sample_anchor', 'center') # Default anchor if None
                         }
                         

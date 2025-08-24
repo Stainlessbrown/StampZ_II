@@ -519,6 +519,9 @@ class ColorAnalyzer:
                     rgb_r=measurement.rgb[0],
                     rgb_g=measurement.rgb[1],
                     rgb_b=measurement.rgb[2],
+                    sample_type=measurement.sample_area.get('type', 'circle'),
+                    sample_size=f"{measurement.sample_area.get('size', (20, 20))[0]}x{measurement.sample_area.get('size', (20, 20))[1]}",
+                    sample_anchor=measurement.sample_area.get('anchor', 'center'),
                     notes=measurement.notes
                 )
                 
@@ -615,6 +618,9 @@ class ColorAnalyzer:
                         rgb_r=measurement.rgb[0],
                         rgb_g=measurement.rgb[1],
                         rgb_b=measurement.rgb[2],
+                        sample_type=measurement.sample_area.get('type', 'circle'),
+                        sample_size=f"{measurement.sample_area.get('size', (20, 20))[0]}x{measurement.sample_area.get('size', (20, 20))[1]}",
+                        sample_anchor=measurement.sample_area.get('anchor', 'center'),
                         notes=measurement.notes
                     ):
                         print(f"Failed to save measurement {i + 1} to database")
