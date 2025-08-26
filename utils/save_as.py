@@ -24,7 +24,7 @@ class SaveFormat:
     @classmethod
     def get_supported_formats(cls) -> List[str]:
         """Get list of supported save formats."""
-        return [cls.TIFF, cls.JPEG, cls.PNG]
+        return [cls.TIFF, cls.PNG]
     
     @classmethod
     def get_extension(cls, format: str) -> str:
@@ -83,8 +83,8 @@ class SaveOptions:
         Initialize save options.
         
         Args:
-            format: Output format ('PNG' or 'JPEG')
-            jpeg_quality: JPEG quality (1-100, ignored for PNG)
+            format: Output format ('TIFF' or 'PNG')
+            jpeg_quality: JPEG quality (1-100, deprecated - kept for compatibility)
             optimize: Whether to optimize the output file
         """
         self.format = SaveFormat.validate_format(format)
@@ -191,12 +191,12 @@ class SaveManager:
         suggested_name = f"{suggested_name}{options.extension}"
         
         # Set up filetypes for dialog
-        if options.format == SaveFormat.JPEG:
+        if options.format == SaveFormat.PNG:
             filetypes = [
-                ('JPEG files', '*.jpg'),
+                ('PNG files', '*.png'),
                 ('All files', '*.*')
             ]
-        else:  # TIFF
+        else:  # TIFF (default)
             filetypes = [
                 ('TIFF files', '*.tif'),
                 ('All files', '*.*')
@@ -214,7 +214,7 @@ class SaveManager:
             base_name, ext = os.path.splitext(filepath)
             
             # Handle format selection based on extension and options
-            if respect_extension and ext.lower() in ['.jpg', '.jpeg', '.tif', '.tiff']:
+            if respect_extension and ext.lower() in ['.tif', '.tiff', '.png']:
                 try:
                     detected_format = SaveFormat.detect_format_from_extension(filepath)
                     if detected_format != options.format:
@@ -331,8 +331,8 @@ def save_with_dialog(
     Args:
         image: PIL Image to save
         suggested_name: Suggested filename
-        format: Output format
-        jpeg_quality: JPEG quality (1-100)
+        format: Output format (TIFF or PNG only)
+        jpeg_quality: Deprecated parameter, kept for compatibility
         
     Returns:
         Path where image was saved, or None if cancelled

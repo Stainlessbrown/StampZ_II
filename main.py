@@ -388,33 +388,18 @@ class StampZApp:
             panel_options = self.control_panel.get_save_options()
             save_manager = SaveManager()
             
-            # Reorder file types to prioritize formats best for analysis data preservation
+            # Only show formats suitable for color analysis
             filetypes = [
                 ('Recommended for Analysis', '*.tif *.png'),
                 ('16-bit TIFF (Best Quality)', '*.tif *.tiff'),
                 ('PNG (Lossless)', '*.png'),
-                ('All Image files', '*.tif *.tiff *.png *.jpg *.jpeg'),
-                ('JPEG (Lossy - Not Recommended)', '*.jpg *.jpeg')
+                ('All Supported files', '*.tif *.tiff *.png')
             ]
             
-            # Set default extension based on panel selection, but prioritize quality formats
-            if panel_options.format == SaveFormat.JPEG:
-                default_ext = '.jpg'
-                # Show warning about JPEG format choice
-                continue_save = messagebox.askyesno(
-                    "JPEG Format Warning",
-                    "⚠️  You've selected JPEG format, which uses lossy compression.\n\n"
-                    "This may reduce color analysis accuracy due to compression artifacts.\n\n"
-                    "For best results, consider using:\n"
-                    "• TIFF format (supports 16-bit, lossless)\n"
-                    "• PNG format (lossless compression)\n\n"
-                    "Do you want to continue with JPEG format?"
-                )
-                if not continue_save:
-                    return  # User chose to reconsider format
-            elif panel_options.format == SaveFormat.PNG:
+            # Set default extension based on panel selection
+            if panel_options.format == SaveFormat.PNG:
                 default_ext = '.png'
-            else:  # TIFF (best choice)
+            else:  # TIFF (default and best choice for color analysis)
                 default_ext = '.tif'
 
             filename_manager = FilenameManager()
@@ -446,21 +431,17 @@ class StampZApp:
             if filepath:
                 ext = os.path.splitext(filepath)[1].lower()
                 if ext in ['.jpg', '.jpeg']:
-                    selected_format = SaveFormat.JPEG
-                    # Additional warning if user selected JPEG via file extension instead of format option
-                    if panel_options.format != SaveFormat.JPEG:
-                        continue_jpeg = messagebox.askyesno(
-                            "JPEG Format Chosen by Extension",
-                            "⚠️  You've selected a JPEG filename extension (.jpg/.jpeg).\n\n"
-                            "JPEG uses lossy compression which can introduce artifacts that\n"
-                            "may affect color analysis accuracy.\n\n"
-                            "For precise color analysis, consider using:\n"
-                            "• .tif extension (16-bit support, lossless)\n"
-                            "• .png extension (lossless compression)\n\n"
-                            "Continue with JPEG format?"
-                        )
-                        if not continue_jpeg:
-                            return  # User decided to reconsider
+                    # JPEG is not supported for saving - show error and suggest alternatives
+                    messagebox.showerror(
+                        "JPEG Format Not Supported for Saving",
+                        "⚠️  JPEG format is not supported for saving in this application.\n\n"
+                        "JPEG uses lossy compression which reduces color analysis accuracy.\n\n"
+                        "Please choose a lossless format:\n"
+                        "• .tif extension (16-bit support, best for analysis)\n"
+                        "• .png extension (lossless compression)\n\n"
+                        "Note: You can still open JPEG files for analysis."
+                    )
+                    return  # Cancel save operation
                 elif ext in ['.tif', '.tiff']:
                     selected_format = SaveFormat.TIFF
                 elif ext == '.png':
@@ -473,7 +454,7 @@ class StampZApp:
                 if selected_format != panel_options.format:
                     panel_options = SaveOptions(
                         format=selected_format,
-                        jpeg_quality=panel_options.jpeg_quality if selected_format == SaveFormat.JPEG else 95,
+                        jpeg_quality=95,  # Not used for TIFF/PNG but kept for compatibility
                         optimize=True
                     )
 
@@ -532,7 +513,7 @@ class StampZApp:
         try:
             from __init__ import __version__, __app_name__, __description__
         except ImportError:
-            __version__ = "Unknown"
+            __version__ = "2.0.2"
             __app_name__ = "StampZ_II"
             __description__ = "Image analysis and color analysis tool"
         
@@ -733,6 +714,123 @@ class StampZApp:
             messagebox.showerror(
                 "Save Error",
                 f"Failed to save sample set:\n\n{str(e)}"
+            )
+    
+    def _update_sample_set(self):
+        """Update existing template with current changes (positions and settings)."""
+        print("DEBUG: _update_sample_set() called in main.py")
+        try:
+            # Check if we have sample markers to save
+            if not hasattr(self.canvas, '_coord_markers') or not self.canvas._coord_markers:
+                print("DEBUG: No sample markers found")
+                messagebox.showwarning(
+                    "No Samples",
+                    "No sample points found. Please place some sample markers first."
+                )
+                return
+
+            if not self.canvas.original_image:
+                print("DEBUG: No original image found")
+                messagebox.showwarning(
+                    "No Image",
+                    "Please open an image before updating template."
+                )
+                return
+
+            # Get template name
+            template_name = self.control_panel.sample_set_name.get().strip()
+            print(f"DEBUG: Template name for update: '{template_name}'")
+            if not template_name:
+                print("DEBUG: No template name provided")
+                messagebox.showwarning(
+                    "No Template Name",
+                    "Please enter or load a template name before updating."
+                )
+                return
+            
+            # Don't allow updating MAN_MODE
+            if template_name == "MAN_MODE":
+                messagebox.showwarning(
+                    "Cannot Update Manual Mode",
+                    "Manual mode samples cannot be updated. Use Save to create a new template."
+                )
+                return
+
+            # Create coordinate points from current markers AND current control panel settings
+            from utils.coordinate_db import CoordinateDB, CoordinatePoint, SampleAreaType
+            print("DEBUG: About to create coordinates from current markers and control panel settings")
+            coordinates = []
+            non_preview_markers = [m for m in self.canvas._coord_markers if not m.get('is_preview', False)]
+            
+            for i, marker in enumerate(non_preview_markers):
+                # Get marker position (this includes any position changes from fine adjustments)
+                image_x, image_y = marker['image_pos']
+                
+                # Get current sample parameters from control panel (may have been modified)
+                if i < len(self.control_panel.sample_controls):
+                    control = self.control_panel.sample_controls[i]
+                    sample_shape = control['shape'].get()
+                    width = float(control['width'].get())
+                    height = float(control['height'].get())
+                    anchor = control['anchor'].get()
+                    print(f"DEBUG: Using control panel settings for sample {i+1}: {sample_shape} {width}x{height} {anchor}")
+                else:
+                    # Fallback to marker data if no control panel data available
+                    sample_shape = marker['sample_type']
+                    width = float(marker['sample_width'])
+                    height = float(marker['sample_height'])
+                    anchor = marker['anchor']
+                    print(f"DEBUG: Using marker settings for sample {i+1}: {sample_shape} {width}x{height} {anchor}")
+                
+                sample_type = SampleAreaType.CIRCLE if sample_shape == 'circle' else SampleAreaType.RECTANGLE
+
+                # Create coordinate point with current settings
+                coord = CoordinatePoint(
+                    x=image_x,
+                    y=image_y,
+                    sample_type=sample_type,
+                    sample_size=(width, height),
+                    anchor_position=anchor
+                )
+                coordinates.append(coord)
+                print(f"DEBUG: Added coordinate for update: x={image_x}, y={image_y}, type={sample_type}, size=({width}, {height}), anchor={anchor}")
+
+            print(f"DEBUG: Created {len(coordinates)} coordinates for template update")
+            
+            # Update coordinates in database (existing save_coordinate_set handles updates)
+            db = CoordinateDB()
+            success, standardized_name = db.save_coordinate_set(
+                name=template_name,
+                image_path=self.current_file,
+                coordinates=coordinates
+            )
+            print(f"DEBUG: Database update result: success={success}, standardized_name={standardized_name}")
+
+            if success:
+                # Update the template protection to reflect the new state
+                print(f"DEBUG: Updating template protection for '{standardized_name}'")
+                self.control_panel.template_protection.protect_template(standardized_name, coordinates)
+                
+                # Refresh the visual display to show the updated parameters
+                print(f"DEBUG: Refreshing visual display after template update")
+                self._refresh_sample_markers_display(coordinates)
+                
+                messagebox.showinfo(
+                    "Template Updated",
+                    f"Successfully updated template '{standardized_name}' with {len(coordinates)} sample points.\n\n"
+                    "All changes including marker positions and settings have been saved and are now visible."
+                )
+            else:
+                messagebox.showerror(
+                    "Update Error",
+                    f"Failed to update template '{template_name}': {standardized_name}"
+                )
+
+        except Exception as e:
+            print(f"DEBUG: Error in _update_sample_set: {e}")
+            messagebox.showerror(
+                "Update Error",
+                f"Failed to update template:\n\n{str(e)}"
             )
 
     def _apply_straightening(self):
@@ -2825,6 +2923,92 @@ class StampZApp:
         self.control_panel.offset_status.set("No offsets applied")
 
         messagebox.showinfo("Reset Complete", "All offset values have been reset to 0.")
+
+    def _refresh_sample_markers_display(self, coordinates):
+        """Refresh the visual sample markers to reflect updated parameters."""
+        print(f"DEBUG: _refresh_sample_markers_display called with {len(coordinates)} coordinates")
+        
+        if not hasattr(self.canvas, '_coord_markers') or not coordinates:
+            return
+        
+        try:
+            # Clear existing visual markers
+            for marker in self.canvas._coord_markers:
+                tag = marker.get('tag')
+                if tag:
+                    self.canvas.delete(tag)
+            
+            # Update markers with new parameters and redraw them
+            non_preview_markers = [m for m in self.canvas._coord_markers if not m.get('is_preview', False)]
+            line_color = self.control_panel.get_line_color()
+            
+            for i, (marker, coord) in enumerate(zip(non_preview_markers, coordinates)):
+                # Update marker parameters from coordinate data
+                marker['sample_type'] = 'circle' if coord.sample_type.value == 'circle' else 'rectangle'
+                marker['sample_width'] = coord.sample_size[0]
+                marker['sample_height'] = coord.sample_size[1]
+                marker['anchor'] = coord.anchor_position
+                
+                # Keep the existing position (already updated from fine-tuning if any)
+                canvas_x, canvas_y = self.canvas._image_to_screen_coords(*marker['image_pos'])
+                marker['canvas_pos'] = (canvas_x, canvas_y)
+                
+                # Create new visual marker
+                new_tag = f"coord_marker_{i}_updated"
+                marker['tag'] = new_tag
+                
+                sample_type = marker['sample_type']
+                width = marker['sample_width']
+                height = marker['sample_height']
+                
+                if sample_type == 'circle':
+                    radius = width / 2
+                    self.canvas.create_oval(
+                        canvas_x - radius, canvas_y - radius,
+                        canvas_x + radius, canvas_y + radius,
+                        outline=line_color, width=2, tags=new_tag
+                    )
+                else:  # rectangle
+                    half_w = width / 2
+                    half_h = height / 2
+                    self.canvas.create_rectangle(
+                        canvas_x - half_w, canvas_y - half_h,
+                        canvas_x + half_w, canvas_y + half_h,
+                        outline=line_color, width=2, tags=new_tag
+                    )
+                
+                # Draw cross marker
+                cross_size = 8
+                self.canvas.create_line(
+                    canvas_x - cross_size, canvas_y,
+                    canvas_x + cross_size, canvas_y,
+                    fill=line_color, width=2, tags=new_tag
+                )
+                self.canvas.create_line(
+                    canvas_x, canvas_y - cross_size,
+                    canvas_x, canvas_y + cross_size,
+                    fill=line_color, width=2, tags=new_tag
+                )
+                
+                # Draw sample number
+                self.canvas.create_text(
+                    canvas_x + 12, canvas_y - 12,
+                    text=str(i + 1),
+                    fill=line_color, font=("Arial", 10, "bold"),
+                    tags=new_tag
+                )
+                
+                print(f"DEBUG: Refreshed marker {i+1}: {sample_type} {width}x{height} {coord.anchor_position} at ({marker['image_pos']})")
+            
+            # Force canvas update
+            self.canvas.update_idletasks()
+            self.canvas.update_display()
+            print(f"DEBUG: Display refresh complete")
+            
+        except Exception as e:
+            print(f"DEBUG: Error refreshing display: {e}")
+            import traceback
+            traceback.print_exc()
 
     def open_database_viewer(self):
         from gui.database_viewer import DatabaseViewer

@@ -1,6 +1,6 @@
 {
   "export_prefs": {
-    "ods_export_directory": "/Users/stanbrown/Desktop/Color Analysis spreadsheets",
+    "ods_export_directory": null,
     "auto_open_after_export": true,
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
@@ -11,11 +11,11 @@
   },
   "file_dialog_prefs": {
     "last_open_directory": "/Users/stanbrown/Desktop/Semeuse comparisons scans",
-    "last_save_directory": "/Users/stanbrown/Desktop/Test137-crp.tif",
+    "last_save_directory": "/Users/stanbrown/Desktop/F137-S41R-crp.tif",
     "remember_directories": true
   },
   "color_library_prefs": {
-    "default_library": "sg_1"
+    "default_library": "basic_colors"
   },
   "interface_prefs": {
     "interface_mode": "basic"

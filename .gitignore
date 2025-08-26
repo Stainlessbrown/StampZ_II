@@ -53,5 +53,8 @@ data/color_libraries/*_library.db
 !data/color_libraries/basic_colors_library.db
 !data/color_libraries/philatelic_colors_library.db
 
+# User preferences (personal settings, not starter defaults)
+preferences.json
+
 # Logs
 *.log

@@ -29,7 +29,7 @@ class PreferencesDialog:
         
     def _setup_dialog(self):
         """Set up the dialog window."""
-        self.root.title("StampZ Preferences")
+        self.root.title("Preferences & Setup")
         
         # Get screen dimensions to calculate optimal dialog size
         screen_width = self.root.winfo_screenwidth()
@@ -108,17 +108,17 @@ class PreferencesDialog:
         notebook = ttk.Notebook(content_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
         
-        # Export preferences tab
-        self._create_export_tab(notebook)
+        # Migration tab (only show if migration is possible) - First priority
+        self._create_migration_tab(notebook)
         
-        # File dialog preferences tab
+        # File dialog preferences tab - Basic workflow setup
         self._create_file_dialog_tab(notebook)
         
-        # Interface preferences tab
-        self._create_interface_tab(notebook)
+        # Export preferences tab - Core functionality setup
+        self._create_export_tab(notebook)
         
-        # Migration tab (only show if migration is possible)
-        self._create_migration_tab(notebook)
+        # Sampling preferences tab - Advanced configuration
+        self._create_sampling_tab(notebook)
         
         # Future tabs can be added here
         # self._create_general_tab(notebook)
@@ -452,83 +452,14 @@ class PreferencesDialog:
             font=("TkDefaultFont", 9)
         ).pack(anchor=tk.W)
     
-    def _create_interface_tab(self, notebook):
-        """Create the interface preferences tab."""
-        interface_frame = ttk.Frame(notebook, padding="10")
-        notebook.add(interface_frame, text="Interface")
-        
-        # Interface mode section
-        mode_frame = ttk.LabelFrame(interface_frame, text="Interface Complexity Level", padding="10")
-        mode_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        ttk.Label(
-            mode_frame, 
-            text="Choose the level of interface complexity that best suits your needs:",
-            font=("TkDefaultFont", 10, "bold")
-        ).pack(anchor=tk.W, pady=(0, 10))
-        
-        self.interface_mode_var = tk.StringVar()
-        
-        # Basic mode
-        basic_frame = ttk.Frame(mode_frame)
-        basic_frame.pack(fill=tk.X, pady=(0, 5))
-        
-        ttk.Radiobutton(
-            basic_frame,
-            text="Basic Mode",
-            variable=self.interface_mode_var,
-            value="basic"
-        ).pack(anchor=tk.W)
-        
-        ttk.Label(
-            basic_frame,
-            text="• One-click scanning recommendations\n• Simplified controls and guided workflows\n• Circular sampling (recommended for most cases)\n• Basic color difference reports",
-            font=("TkDefaultFont", 10),
-            foreground="#444444",
-            justify=tk.LEFT
-        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
-        
-        # Detailed Analysis mode
-        detailed_frame = ttk.Frame(mode_frame)
-        detailed_frame.pack(fill=tk.X, pady=(5, 5))
-        
-        ttk.Radiobutton(
-            detailed_frame,
-            text="Detailed Analysis Mode",
-            variable=self.interface_mode_var,
-            value="detailed"
-        ).pack(anchor=tk.W)
-        
-        ttk.Label(
-            detailed_frame,
-            text="• More analysis options and controls\n• Additional color space conversions\n• Enhanced statistical reporting\n• Sampling method selection",
-            font=("TkDefaultFont", 10),
-            foreground="#444444",
-            justify=tk.LEFT
-        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
-        
-        # Expert mode
-        expert_frame = ttk.Frame(mode_frame)
-        expert_frame.pack(fill=tk.X, pady=(5, 0))
-        
-        ttk.Radiobutton(
-            expert_frame,
-            text="Expert Mode",
-            variable=self.interface_mode_var,
-            value="expert"
-        ).pack(anchor=tk.W)
-        
-        ttk.Label(
-            expert_frame,
-            text="• All advanced controls and options\n• Complete sampling algorithm details\n• Full statistical methods access\n• Advanced sampling and analysis features",
-            font=("TkDefaultFont", 10),
-            foreground="#444444",
-            justify=tk.LEFT
-        ).pack(anchor=tk.W, padx=(20, 0), pady=(2, 0))
+    def _create_sampling_tab(self, notebook):
+        """Create the sampling preferences tab."""
+        sampling_frame = ttk.Frame(notebook, padding="10")
+        notebook.add(sampling_frame, text="Sampling")
         
         # Sample area defaults section
-        sample_frame = ttk.LabelFrame(interface_frame, text="Sample Area Defaults", padding="10")
-        sample_frame.pack(fill=tk.X, pady=(10, 0))
+        sample_frame = ttk.LabelFrame(sampling_frame, text="Sample Area Defaults", padding="10")
+        sample_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(
             sample_frame, 
@@ -621,16 +552,15 @@ class PreferencesDialog:
             foreground="gray"
         ).pack(anchor=tk.W, pady=(10, 0))
         
-        # Mode change info
-        info_frame = ttk.LabelFrame(interface_frame, text="Information", padding="10")
+        # Information section
+        info_frame = ttk.LabelFrame(sampling_frame, text="Information", padding="10")
         info_frame.pack(fill=tk.X, pady=(10, 0))
         
         info_text = (
-            "• Interface mode changes take effect immediately after applying preferences\n"
-            "• You can switch between modes at any time\n"
-            "• Basic mode is recommended for new users and quick analysis tasks\n"
-            "• Expert mode provides access to all advanced features for specialized workflows\n"
-            "• Sample area defaults apply to all new samples across all interface modes"
+            "• Sample area defaults apply to all new samples created in the application\n"
+            "• You can override these defaults for individual samples after placement\n"
+            "• Circle samples are recommended for most color analysis tasks\n"
+            "• Rectangle samples are useful for analyzing larger color areas or patterns"
         )
         
         ttk.Label(
@@ -997,9 +927,7 @@ class PreferencesDialog:
         # Color library preferences
         self._load_color_library_preferences()
         
-        # Interface mode preference
-        interface_mode = self.prefs_manager.get_interface_mode()
-        self.interface_mode_var.set(interface_mode)
+        # Interface mode preference removed
         
         # Sample area preferences
         self.sample_shape_var.set(self.prefs_manager.get_default_sample_shape())
@@ -1113,10 +1041,7 @@ class PreferencesDialog:
                     library_name = self._library_mapping[display_name]
                     self.prefs_manager.set_default_color_library(library_name)
             
-            # Interface mode preference
-            interface_mode = self.interface_mode_var.get()
-            if interface_mode:
-                self.prefs_manager.set_interface_mode(interface_mode)
+            # Interface mode preference removed
             
             # Sample area preferences
             self.prefs_manager.set_default_sample_shape(self.sample_shape_var.get())

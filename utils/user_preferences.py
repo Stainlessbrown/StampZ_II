@@ -47,12 +47,7 @@ class SampleAreaPreferences:
     default_anchor: str = "center"  # Default anchor position
 
 
-@dataclass
-class InterfacePreferences:
-    """Preferences for user interface behavior."""
-    interface_mode: str = "basic"  # Interface mode: "basic", "detailed", or "expert"
-    
-    
+# InterfacePreferences class removed - complexity levels no longer used
 @dataclass 
 class UserPreferences:
     """Main user preferences container."""
@@ -60,14 +55,14 @@ class UserPreferences:
     file_dialog_prefs: FileDialogPreferences
     color_library_prefs: ColorLibraryPreferences
     sample_area_prefs: SampleAreaPreferences
-    interface_prefs: InterfacePreferences
+    # interface_prefs removed - complexity levels no longer used
     
     def __init__(self):
         self.export_prefs = ExportPreferences()
         self.file_dialog_prefs = FileDialogPreferences()
         self.color_library_prefs = ColorLibraryPreferences()
         self.sample_area_prefs = SampleAreaPreferences()
-        self.interface_prefs = InterfacePreferences()
+        # self.interface_prefs removed - complexity levels no longer used
 
 
 class PreferencesManager:
@@ -323,39 +318,7 @@ class PreferencesManager:
             print(f"Error getting available color libraries: {e}")
             return ["basic_colors"]
     
-    def get_interface_mode(self) -> str:
-        """Get the current interface mode."""
-        return self.preferences.interface_prefs.interface_mode
-    
-    def set_interface_mode(self, mode: str) -> bool:
-        """Set the interface mode.
-        
-        Args:
-            mode: Interface mode ('basic', 'detailed', or 'expert')
-        """
-        if mode not in ['basic', 'detailed', 'expert']:
-            print(f"Error: Invalid interface mode '{mode}'. Use 'basic', 'detailed', or 'expert'.")
-            return False
-        
-        try:
-            self.preferences.interface_prefs.interface_mode = mode
-            self.save_preferences()
-            return True
-        except Exception as e:
-            print(f"Error setting interface mode: {e}")
-            return False
-    
-    def is_basic_mode(self) -> bool:
-        """Check if interface is in basic mode."""
-        return self.get_interface_mode() == "basic"
-    
-    def is_detailed_mode(self) -> bool:
-        """Check if interface is in detailed analysis mode."""
-        return self.get_interface_mode() == "detailed"
-    
-    def is_expert_mode(self) -> bool:
-        """Check if interface is in expert mode."""
-        return self.get_interface_mode() == "expert"
+    # Interface mode methods removed - complexity levels no longer used
     
     def get_default_sample_shape(self) -> str:
         """Get the default sample area shape."""
@@ -531,12 +494,7 @@ class PreferencesManager:
                         default_anchor=sample_data.get('default_anchor', 'center')
                     )
                 
-                # Load interface preferences
-                if 'interface_prefs' in data:
-                    interface_data = data['interface_prefs']
-                    self.preferences.interface_prefs = InterfacePreferences(
-                        interface_mode=interface_data.get('interface_mode', 'basic')
-                    )
+                # Interface preferences removed - complexity levels no longer used
                 
                 print(f"Loaded preferences from {self.prefs_file}")
                 return True
@@ -569,7 +527,7 @@ class PreferencesManager:
                 'file_dialog_prefs': asdict(self.preferences.file_dialog_prefs),
                 'color_library_prefs': asdict(self.preferences.color_library_prefs),
                 'sample_area_prefs': asdict(self.preferences.sample_area_prefs),
-                'interface_prefs': asdict(self.preferences.interface_prefs)
+                # 'interface_prefs': removed - complexity levels no longer used
             })
             
             with open(self.prefs_file, 'w') as f:
@@ -618,21 +576,4 @@ def set_export_directory(directory: str) -> bool:
     return get_preferences_manager().set_export_directory(directory)
 
 
-def get_interface_mode() -> str:
-    """Convenience function to get current interface mode."""
-    return get_preferences_manager().get_interface_mode()
-
-
-def is_basic_mode() -> bool:
-    """Convenience function to check if interface is in basic mode."""
-    return get_preferences_manager().is_basic_mode()
-
-
-def is_detailed_mode() -> bool:
-    """Convenience function to check if interface is in detailed analysis mode."""
-    return get_preferences_manager().is_detailed_mode()
-
-
-def is_expert_mode() -> bool:
-    """Convenience function to check if interface is in expert mode."""
-    return get_preferences_manager().is_expert_mode()
+# Interface mode convenience functions removed - complexity levels no longer used

@@ -355,7 +355,7 @@ class CollapsibleControlPanel(ttk.Frame):
         format_combo = ttk.Combobox(
             format_frame,
             textvariable=self.save_format,
-            values=[SaveFormat.TIFF, SaveFormat.PNG, SaveFormat.JPEG],
+            values=[SaveFormat.TIFF, SaveFormat.PNG],
             state="readonly"
         )
         format_combo.pack(fill=tk.X, pady=1)
@@ -412,11 +412,9 @@ class CollapsibleControlPanel(ttk.Frame):
             self.callbacks['on_transparency_change'](transparency)
     
     def _on_save_format_change(self, *args):
-        """Show/hide JPEG quality based on format selection."""
-        if self.save_format.get() == SaveFormat.JPEG:
-            self.quality_frame.pack(fill=tk.X, pady=2)
-        else:
-            self.quality_frame.pack_forget()
+        """Show/hide JPEG quality based on format selection (JPEG no longer supported for saving)."""
+        # JPEG is no longer supported for saving, so always hide quality frame
+        self.quality_frame.pack_forget()
     
     # Color library integration
     def _open_color_library(self):

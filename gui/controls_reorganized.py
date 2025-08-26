@@ -512,6 +512,10 @@ class ReorganizedControlPanel(ttk.Frame):
         self.save_sample_button.pack(side=tk.LEFT, padx=1)
         print("DEBUG: Save button created and packed")
         
+        # Add Update Template button
+        self.update_sample_button = ttk.Button(button_container, text="Update", command=self._update_sample_set, width=6)
+        self.update_sample_button.pack(side=tk.LEFT, padx=1)
+        
         self.delete_sample_button = ttk.Button(button_container, text="Delete", command=self._delete_sample_set, width=5)
         self.delete_sample_button.pack(side=tk.LEFT, padx=1)
         
@@ -898,7 +902,7 @@ class ReorganizedControlPanel(ttk.Frame):
         """Get current save options."""
         return SaveOptions(
             format=self.save_format.get(),
-            jpeg_quality=self.jpg_quality.get() if self.save_format.get() == SaveFormat.JPEG else 95,
+            jpeg_quality=95,  # Not used for TIFF/PNG but kept for compatibility
             optimize=True
         )
 
@@ -1223,6 +1227,70 @@ class ReorganizedControlPanel(ttk.Frame):
         else:
             print("DEBUG: main_app not found or not set")
             messagebox.showinfo("Info", "Save sample set - connect to main app implementation")
+    
+    def _update_sample_set(self):
+        """Update existing template with current changes (positions and settings)."""
+        print("DEBUG: _update_sample_set() called in controls_reorganized.py")
+        
+        # Check if we have a template name to update
+        template_name = self.sample_set_name.get().strip()
+        if not template_name:
+            messagebox.showwarning(
+                "No Template Selected",
+                "Please load or enter a template name before updating."
+            )
+            return
+        
+        # Don't allow updating MAN_MODE
+        if template_name == "MAN_MODE":
+            messagebox.showwarning(
+                "Cannot Update Manual Mode",
+                "Manual mode samples cannot be updated. Use Save to create a new template."
+            )
+            return
+        
+        # Check if template exists in database
+        try:
+            from utils.coordinate_db import CoordinateDB
+            db = CoordinateDB()
+            existing_sets = db.get_all_set_names()
+            
+            if template_name not in existing_sets:
+                # Template doesn't exist - suggest using Save instead
+                if messagebox.askyesno(
+                    "Template Not Found",
+                    f"Template '{template_name}' doesn't exist in the database.\n\n"
+                    "Would you like to save it as a new template instead?"
+                ):
+                    self._save_sample_set()
+                return
+        except Exception as e:
+            print(f"DEBUG: Error checking existing templates: {e}")
+            messagebox.showerror("Error", f"Failed to check existing templates: {str(e)}")
+            return
+        
+        # Confirm the update operation
+        if not messagebox.askyesno(
+            "Update Template",
+            f"Are you sure you want to update template '{template_name}'?\n\n"
+            "This will overwrite the existing template with:\n"
+            "• Current marker positions (including fine adjustments)\n"
+            "• Current shape, size, and anchor settings\n\n"
+            "This action cannot be undone."
+        ):
+            return
+        
+        # Call main app update method
+        if hasattr(self, 'main_app') and self.main_app:
+            if hasattr(self.main_app, '_update_sample_set'):
+                print("DEBUG: Calling self.main_app._update_sample_set()")
+                self.main_app._update_sample_set()
+            else:
+                print("DEBUG: main_app._update_sample_set method not found")
+                messagebox.showinfo("Info", "Update sample set method not found in main app")
+        else:
+            print("DEBUG: main_app not found or not set")
+            messagebox.showinfo("Info", "Update sample set - connect to main app implementation")
     
     def _load_sample_set(self):
         """Load sample set template."""
