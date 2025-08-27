@@ -246,11 +246,20 @@ class Plot3DIntegrationPanel:
             # Update status
             self._update_status("Converting data...", "orange")
             
+            # Get template name if available
+            template_name = None
+            if self.get_current_sample_set:
+                template_name = self.get_current_sample_set()
+                # Remove common suffixes to get clean template name
+                if template_name and template_name.endswith('_averages'):
+                    template_name = template_name[:-9]  # Remove '_averages'
+            
             # Perform integration
             success = self.integrator.integrate_stampz_data(
                 stampz_export_path=export_file,
                 plot3d_file_path=plot3d_file if plot3d_file != "Auto-detect" else None,
-                create_if_missing=self._get_create_new_option()
+                create_if_missing=self._get_create_new_option(),
+                template_name=template_name
             )
             
             if success:

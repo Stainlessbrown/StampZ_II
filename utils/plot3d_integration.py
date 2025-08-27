@@ -392,7 +392,8 @@ class StampZPlot3DIntegrator:
     
     def integrate_stampz_data(self, stampz_export_path: str, 
                              plot3d_file_path: str = None,
-                             create_if_missing: bool = True) -> bool:
+                             create_if_missing: bool = True,
+                             template_name: str = None) -> bool:
         """Main integration function to transfer StampZ data to Plot_3D.
         
         Args:
@@ -424,8 +425,14 @@ class StampZPlot3DIntegrator:
                 
             if plot3d_file_path is None:
                 if create_if_missing:
-                    # Create new Plot_3D file
-                    base_name = os.path.splitext(os.path.basename(stampz_export_path))[0]
+                    # Create new Plot_3D file using template name
+                    if template_name:
+                        # Use provided template name
+                        base_name = template_name
+                    else:
+                        # Extract template name from export filename
+                        base_name = self._extract_template_name_from_export(stampz_export_path)
+                    
                     plot3d_file_path = os.path.join(
                         os.path.dirname(stampz_export_path),
                         f"{base_name}_Plot3D.ods"
@@ -493,6 +500,75 @@ class StampZPlot3DIntegrator:
         except Exception as e:
             self.logger.error(f"Error detecting StampZ exports: {e}")
             return []
+    
+    def _extract_template_name_from_export(self, export_path: str) -> str:
+        """Extract the template/sample set name from an export filename.
+        
+        Args:
+            export_path: Path to the StampZ export file
+            
+        Returns:
+            Template name extracted from filename
+        """
+        try:
+            filename = os.path.basename(export_path)
+            base_name = os.path.splitext(filename)[0]
+            
+            # Remove common export suffixes to get the template name
+            # Examples: 
+            #   "137_averages_20250827" -> "137" 
+            #   "F-137_export_20250827" -> "F-137"
+            #   "Color_Test_normalized_data" -> "Color_Test"
+            
+            # Common patterns to remove
+            suffixes_to_remove = [
+                '_averages',
+                '_export', 
+                '_normalized', 
+                '_data',
+                '_norm',
+                '_individual'
+            ]
+            
+            # Remove date patterns (YYYYMMDD format)
+            import re
+            base_name = re.sub(r'_\d{8}$', '', base_name)  # Remove trailing _YYYYMMDD
+            base_name = re.sub(r'_\d{8}_\d{6}$', '', base_name)  # Remove _YYYYMMDD_HHMMSS
+            
+            # Remove common suffixes
+            for suffix in suffixes_to_remove:
+                if base_name.endswith(suffix):
+                    base_name = base_name[:-len(suffix)]
+                    break  # Only remove first match to avoid over-trimming
+            
+            # If we still have underscores followed by what looks like timestamps or version numbers
+            # Keep only the first part
+            parts = base_name.split('_')
+            if len(parts) > 1:
+                # Check if later parts look like version numbers or timestamps
+                for i, part in enumerate(parts[1:], 1):
+                    if (part.isdigit() or  # Pure numbers
+                        re.match(r'^v?\d+(\.\d+)*$', part) or  # Version numbers
+                        len(part) >= 6 and part.replace('-', '').replace(':', '').isdigit()):  # Timestamps
+                        base_name = '_'.join(parts[:i])
+                        break
+            
+            # Final cleanup - ensure we have a reasonable template name
+            if not base_name or base_name.isdigit():
+                # If we ended up with just numbers or empty string, use the original base
+                base_name = os.path.splitext(os.path.basename(export_path))[0]
+                # Try a simpler approach - just take the first meaningful part
+                first_part = base_name.split('_')[0]
+                if first_part and not first_part.isdigit():
+                    base_name = first_part
+            
+            self.logger.debug(f"Extracted template name '{base_name}' from '{filename}'")
+            return base_name
+            
+        except Exception as e:
+            self.logger.warning(f"Error extracting template name from '{export_path}': {e}")
+            # Fallback to just the filename without extension
+            return os.path.splitext(os.path.basename(export_path))[0]
     
     def _is_stampz_export_file(self, file_path: str) -> bool:
         """Check if file is a StampZ export file.
