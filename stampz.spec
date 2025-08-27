@@ -57,6 +57,15 @@ try:
 except Exception:
     pass
 
+# Collect lxml data files and imports for XML/HTML parsing
+try:
+    lxml_datas, lxml_binaries, lxml_hiddenimports = collect_all('lxml')
+    datas += lxml_datas
+    binaries += lxml_binaries
+    hiddenimports += lxml_hiddenimports
+except Exception:
+    pass
+
 # Add additional hidden imports
 hiddenimports += [
     'PIL.Image',
@@ -91,6 +100,9 @@ hiddenimports += [
     'odf.style',
     'odf.number',
     'ezodf',
+    'lxml',
+    'lxml.etree',
+    'lxml.html',
     'openpyxl',
     'tifffile',
 ]
