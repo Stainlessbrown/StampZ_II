@@ -327,18 +327,16 @@ class ColorComparisonManager(tk.Frame):
             rgb = sample['rgb']
             lab = self.library.rgb_to_lab(rgb) if self.library else None
             
-            if lab:
-                value_text = (f"L*: {lab[0]:>6.1f}  a*: {lab[1]:>6.1f}  b*: {lab[2]:>6.1f}\n" +
-                             f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}")
-                
-                # Add ΔE from average if we have both values
-                if average_lab and sample['enabled'].get():
-                    from utils.color_analyzer import ColorAnalyzer
-                    analyzer = ColorAnalyzer()
-                    delta_e = analyzer.calculate_delta_e(lab, average_lab)
-                    value_text += f"\nΔE from avg: {delta_e:.2f}"
-            else:
-                value_text = f"R: {int(rgb[0]):>3}  G: {int(rgb[1]):>3}  B: {int(rgb[2]):>3}"
+            # Use conditional color display based on user preferences
+            from utils.color_display_utils import get_conditional_color_values_text
+            value_text = get_conditional_color_values_text(rgb, lab, compact=True)
+            
+            # Add ΔE from average if we have both values
+            if lab and average_lab and sample['enabled'].get():
+                from utils.color_analyzer import ColorAnalyzer
+                analyzer = ColorAnalyzer()
+                delta_e = analyzer.calculate_delta_e(lab, average_lab)
+                value_text += f"\nΔE from avg: {delta_e:.2f}"
             
             ttk.Label(frame, text=value_text, font=("Arial", 12)).pack(side=tk.LEFT, padx=20)
             
@@ -415,12 +413,9 @@ class ColorComparisonManager(tk.Frame):
             outline=''
         )
         
-        # Color values
-        if avg_lab:
-            value_text = (f"L*: {avg_lab[0]:>6.1f}  a*: {avg_lab[1]:>6.1f}  b*: {avg_lab[2]:>6.1f}\n" +
-                         f"R: {int(avg_rgb[0]):>3}  G: {int(avg_rgb[1]):>3}  B: {int(avg_rgb[2]):>3}")
-        else:
-            value_text = f"R: {int(avg_rgb[0]):>3}  G: {int(avg_rgb[1]):>3}  B: {int(avg_rgb[2]):>3}"
+        # Color values based on user preferences
+        from utils.color_display_utils import get_conditional_color_values_text
+        value_text = get_conditional_color_values_text(avg_rgb, avg_lab, compact=True)
         
         # Create a frame for values and button
         values_frame = ttk.Frame(frame)
@@ -720,10 +715,22 @@ class ColorComparisonManager(tk.Frame):
                     log_debug(f"  Total measurements: {len(all_measurements)}")
                     
                     # Look for individual measurements (not averaged) with this image name
-                    individual_measurements = [
-                        m for m in all_measurements 
-                        if not m.get('is_averaged', False) and m.get('image_name') == image_name
-                    ]
+                    # Try both exact match and partial match (database might store base name like 'S1' while we search for '138-S1-crp_1')
+                    individual_measurements = []
+                    for m in all_measurements:
+                        if m.get('is_averaged', False):  # Skip averaged measurements
+                            continue
+                        
+                        stored_name = m.get('image_name', '')
+                        # Try exact match first
+                        if stored_name == image_name:
+                            individual_measurements.append(m)
+                        # Try partial match (stored name is contained in search name)
+                        elif stored_name and stored_name in image_name:
+                            individual_measurements.append(m)
+                        # Try reverse partial match (search name is contained in stored name)
+                        elif image_name and image_name in stored_name:
+                            individual_measurements.append(m)
                     
                     log_debug(f"  Individual measurements for '{image_name}': {len(individual_measurements)}")
                     

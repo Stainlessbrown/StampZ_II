@@ -67,7 +67,7 @@ class ColorAnalysisDB:
                 )
             """)
             
-            # Table for color measurements
+            # Table for color measurements (individual samples only)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS color_measurements (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,14 +86,11 @@ class ColorAnalysisDB:
                     sample_anchor TEXT,
                     measurement_date TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                     notes TEXT,
-                    is_averaged BOOLEAN DEFAULT 0,
-                    source_samples_count INTEGER,
-                    source_sample_ids TEXT,
                     FOREIGN KEY(set_id) REFERENCES measurement_sets(set_id)
                 )
             """)
             
-            # Add the new columns to existing databases
+            # Add essential columns to existing databases
             cursor = conn.cursor()
             try:
                 cursor.execute("ALTER TABLE color_measurements ADD COLUMN sample_type TEXT")
@@ -110,25 +107,6 @@ class ColorAnalysisDB:
             try:
                 cursor.execute("ALTER TABLE color_measurements ADD COLUMN sample_anchor TEXT")
                 print("Added sample_anchor column")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-                
-            # Add new columns for averaged measurements support
-            try:
-                cursor.execute("ALTER TABLE color_measurements ADD COLUMN is_averaged BOOLEAN DEFAULT 0")
-                print("Added is_averaged column")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-                
-            try:
-                cursor.execute("ALTER TABLE color_measurements ADD COLUMN source_samples_count INTEGER")
-                print("Added source_samples_count column")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-                
-            try:
-                cursor.execute("ALTER TABLE color_measurements ADD COLUMN source_sample_ids TEXT")
-                print("Added source_sample_ids column")
             except sqlite3.OperationalError:
                 pass  # Column already exists
             
@@ -265,94 +243,13 @@ class ColorAnalysisDB:
         image_name: str,
         notes: Optional[str] = None
     ) -> bool:
-        """Save an averaged color measurement to the database.
+        """This method is deprecated. Use AveragedColorAnalysisDB instead.
         
-        Args:
-            set_id: ID of the measurement set
-            averaged_lab: Averaged L*a*b* values as (L, a, b)
-            averaged_rgb: Averaged RGB values as (R, G, B)
-            source_measurements: List of individual measurements that were averaged
-            image_name: Name of the image being analyzed
-            notes: Optional notes about the averaging
-            
-        Returns:
-            True if save was successful
+        Averaged measurements are now stored in separate databases.
+        Use the color analyzer's save_averaged_measurement_from_samples method instead.
         """
-        print(f"DEBUG DB: save_averaged_measurement called")
-        print(f"DEBUG DB: set_id={set_id}, image_name={image_name}")
-        print(f"DEBUG DB: averaged_lab={averaged_lab}, averaged_rgb={averaged_rgb}")
-        print(f"DEBUG DB: source_measurements count={len(source_measurements)}")
-        print(f"DEBUG DB: notes={notes}")
-        
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                # Calculate average position from source measurements
-                avg_x = sum(m.get('x_position', 0) for m in source_measurements) / len(source_measurements)
-                avg_y = sum(m.get('y_position', 0) for m in source_measurements) / len(source_measurements)
-                
-                # Create source sample IDs string for reference
-                source_ids = ','.join(str(m.get('id', '')) for m in source_measurements)
-                
-                # Use coordinate_point = 999 to indicate this is an averaged measurement
-                coordinate_point = 999
-                
-                # Create notes that include averaging information
-                avg_notes = f"Averaged from {len(source_measurements)} samples"
-                if notes:
-                    avg_notes += f": {notes}"
-                
-                # Analyze sample parameters from source measurements
-                sample_types = [m.get('sample_type', '') for m in source_measurements if m.get('sample_type')]
-                sample_sizes = [m.get('sample_size', '') for m in source_measurements if m.get('sample_size')]
-                sample_anchors = [m.get('sample_anchor', '') for m in source_measurements if m.get('sample_anchor')]
-                
-                # Determine aggregated values
-                if sample_types:
-                    unique_types = set(sample_types)
-                    avg_sample_type = sample_types[0] if len(unique_types) == 1 else 'various'
-                else:
-                    unique_types = set()
-                    avg_sample_type = 'unknown'
-                
-                if sample_sizes:
-                    unique_sizes = set(sample_sizes)
-                    avg_sample_size = sample_sizes[0] if len(unique_sizes) == 1 else 'various'
-                else:
-                    unique_sizes = set()
-                    avg_sample_size = 'unknown'
-                
-                if sample_anchors:
-                    unique_anchors = set(sample_anchors)
-                    avg_sample_anchor = sample_anchors[0] if len(unique_anchors) == 1 else 'various'
-                else:
-                    unique_anchors = set()
-                    avg_sample_anchor = 'unknown'
-                
-                print(f"DEBUG: Averaging sample parameters - types: {unique_types}, sizes: {unique_sizes}, anchors: {unique_anchors}")
-                print(f"DEBUG: Result - type: {avg_sample_type}, size: {avg_sample_size}, anchor: {avg_sample_anchor}")
-                
-                # Insert averaged measurement
-                conn.execute("""
-                    INSERT INTO color_measurements (
-                        set_id, coordinate_point, x_position, y_position,
-                        l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
-                        sample_type, sample_size, sample_anchor, notes,
-                        is_averaged, source_samples_count, source_sample_ids
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    set_id, coordinate_point, avg_x, avg_y,
-                    averaged_lab[0], averaged_lab[1], averaged_lab[2],
-                    averaged_rgb[0], averaged_rgb[1], averaged_rgb[2],
-                    avg_sample_type, avg_sample_size, avg_sample_anchor, avg_notes,
-                    1, len(source_measurements), source_ids
-                ))
-                
-                print(f"Saved averaged measurement from {len(source_measurements)} samples for image '{image_name}'")
-                return True
-                
-        except sqlite3.Error as e:
-            print(f"Error saving averaged measurement: {e}")
-            return False
+        print(f"WARNING: save_averaged_measurement is deprecated. Averaged measurements should be saved to separate _averages database.")
+        return False
     
     def get_all_measurements(self) -> List[dict]:
         """Get all color measurements for this sample set.
@@ -362,43 +259,89 @@ class ColorAnalysisDB:
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
-                    SELECT 
-                        m.id, m.set_id, s.image_name, m.measurement_date,
-                        m.coordinate_point, m.x_position, m.y_position,
-                        m.l_value, m.a_value, m.b_value, 
-                        m.rgb_r, m.rgb_g, m.rgb_b,
-                        m.sample_type, m.sample_size, m.sample_anchor,
-                        m.notes, m.is_averaged, m.source_samples_count, m.source_sample_ids
-                    FROM color_measurements m
-                    JOIN measurement_sets s ON m.set_id = s.set_id
-                    ORDER BY s.image_name, m.coordinate_point, m.measurement_date
-                """)
+                # First, check what columns exist in the table
+                cursor = conn.execute("PRAGMA table_info(color_measurements)")
+                columns = [row[1] for row in cursor.fetchall()]
+                has_averaged_columns = all(col in columns for col in ['is_averaged', 'source_samples_count', 'source_sample_ids'])
                 
-                measurements = []
-                for row in cursor:
-                    measurements.append({
-                        'id': row[0],
-                        'set_id': row[1],
-                        'image_name': row[2],
-                        'measurement_date': row[3],
-                        'coordinate_point': row[4],
-                        'x_position': row[5],
-                        'y_position': row[6],
-                        'l_value': row[7],
-                        'a_value': row[8],
-                        'b_value': row[9],
-                        'rgb_r': row[10],
-                        'rgb_g': row[11],
-                        'rgb_b': row[12],
-                        'sample_type': row[13],
-                        'sample_size': row[14],
-                        'sample_anchor': row[15],
-                        'notes': row[16],
-                        'is_averaged': bool(row[17]) if row[17] is not None else False,
-                        'source_samples_count': row[18],
-                        'source_sample_ids': row[19]
-                    })
+                if has_averaged_columns:
+                    # Query with averaged columns (for averaged databases)
+                    cursor = conn.execute("""
+                        SELECT 
+                            m.id, m.set_id, s.image_name, m.measurement_date,
+                            m.coordinate_point, m.x_position, m.y_position,
+                            m.l_value, m.a_value, m.b_value, 
+                            m.rgb_r, m.rgb_g, m.rgb_b,
+                            m.sample_type, m.sample_size, m.sample_anchor,
+                            m.notes, m.is_averaged, m.source_samples_count, m.source_sample_ids
+                        FROM color_measurements m
+                        JOIN measurement_sets s ON m.set_id = s.set_id
+                        ORDER BY s.image_name, m.coordinate_point, m.measurement_date
+                    """)
+                    
+                    measurements = []
+                    for row in cursor:
+                        measurements.append({
+                            'id': row[0],
+                            'set_id': row[1],
+                            'image_name': row[2],
+                            'measurement_date': row[3],
+                            'coordinate_point': row[4],
+                            'x_position': row[5],
+                            'y_position': row[6],
+                            'l_value': row[7],
+                            'a_value': row[8],
+                            'b_value': row[9],
+                            'rgb_r': row[10],
+                            'rgb_g': row[11],
+                            'rgb_b': row[12],
+                            'sample_type': row[13],
+                            'sample_size': row[14],
+                            'sample_anchor': row[15],
+                            'notes': row[16],
+                            'is_averaged': bool(row[17]) if row[17] is not None else False,
+                            'source_samples_count': row[18],
+                            'source_sample_ids': row[19]
+                        })
+                else:
+                    # Query without averaged columns (for main databases)
+                    cursor = conn.execute("""
+                        SELECT 
+                            m.id, m.set_id, s.image_name, m.measurement_date,
+                            m.coordinate_point, m.x_position, m.y_position,
+                            m.l_value, m.a_value, m.b_value, 
+                            m.rgb_r, m.rgb_g, m.rgb_b,
+                            m.sample_type, m.sample_size, m.sample_anchor,
+                            m.notes
+                        FROM color_measurements m
+                        JOIN measurement_sets s ON m.set_id = s.set_id
+                        ORDER BY s.image_name, m.coordinate_point, m.measurement_date
+                    """)
+                    
+                    measurements = []
+                    for row in cursor:
+                        measurements.append({
+                            'id': row[0],
+                            'set_id': row[1],
+                            'image_name': row[2],
+                            'measurement_date': row[3],
+                            'coordinate_point': row[4],
+                            'x_position': row[5],
+                            'y_position': row[6],
+                            'l_value': row[7],
+                            'a_value': row[8],
+                            'b_value': row[9],
+                            'rgb_r': row[10],
+                            'rgb_g': row[11],
+                            'rgb_b': row[12],
+                            'sample_type': row[13],
+                            'sample_size': row[14],
+                            'sample_anchor': row[15],
+                            'notes': row[16],
+                            'is_averaged': False,  # Main DB only contains individual measurements
+                            'source_samples_count': None,
+                            'source_sample_ids': None
+                        })
                 
                 return measurements
         except sqlite3.Error as e:
@@ -545,3 +488,181 @@ class ColorAnalysisDB:
         
         return sorted(sample_sets)
 
+
+class AveragedColorAnalysisDB(ColorAnalysisDB):
+    """Specialized database class for averaged color measurements."""
+    
+    def __init__(self, sample_set_name: str):
+        """Initialize averaged database with _averages suffix.
+        
+        Args:
+            sample_set_name: Base name of the sample set (will be suffixed with _averages)
+        """
+        # Ensure we're working with the _averages version
+        if not sample_set_name.endswith('_averages'):
+            sample_set_name = f"{sample_set_name}_averages"
+        
+        super().__init__(sample_set_name)
+    
+    def _init_db(self):
+        """Initialize averaged color analysis database tables with averaged measurement support."""
+        with sqlite3.connect(self.db_path) as conn:
+            # Table for measurement sets
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS measurement_sets (
+                    set_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    image_name TEXT NOT NULL,
+                    measurement_date TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                    description TEXT
+                )
+            """)
+            
+            # Table for averaged color measurements with extra columns
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS color_measurements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    set_id INTEGER NOT NULL,
+                    coordinate_point INTEGER NOT NULL,
+                    x_position REAL NOT NULL,
+                    y_position REAL NOT NULL,
+                    l_value REAL NOT NULL,
+                    a_value REAL NOT NULL,
+                    b_value REAL NOT NULL,
+                    rgb_r REAL NOT NULL,
+                    rgb_g REAL NOT NULL,
+                    rgb_b REAL NOT NULL,
+                    sample_type TEXT,
+                    sample_size TEXT,
+                    sample_anchor TEXT,
+                    measurement_date TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                    notes TEXT,
+                    is_averaged BOOLEAN DEFAULT 1,
+                    source_samples_count INTEGER,
+                    source_sample_ids TEXT,
+                    FOREIGN KEY(set_id) REFERENCES measurement_sets(set_id)
+                )
+            """)
+            
+            # Add averaged measurement columns to existing databases if needed
+            cursor = conn.cursor()
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN is_averaged BOOLEAN DEFAULT 1")
+                print("Added is_averaged column to averaged database")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+                
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN source_samples_count INTEGER")
+                print("Added source_samples_count column to averaged database")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+                
+            try:
+                cursor.execute("ALTER TABLE color_measurements ADD COLUMN source_sample_ids TEXT")
+                print("Added source_sample_ids column to averaged database")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+            
+            # Index for faster queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_set_point 
+                ON color_measurements(set_id, coordinate_point)
+            """)
+    
+    def save_averaged_measurement(
+        self,
+        set_id: int,
+        averaged_lab: tuple,
+        averaged_rgb: tuple,
+        source_measurements: List[dict],
+        image_name: str,
+        notes: Optional[str] = None
+    ) -> bool:
+        """Save an averaged color measurement to the averages database.
+        
+        Args:
+            set_id: ID of the measurement set
+            averaged_lab: Averaged L*a*b* values as (L, a, b)
+            averaged_rgb: Averaged RGB values as (R, G, B)
+            source_measurements: List of individual measurements that were averaged
+            image_name: Name of the image being analyzed
+            notes: Optional notes about the averaging
+            
+        Returns:
+            True if save was successful
+        """
+        print(f"DEBUG AveragedDB: save_averaged_measurement called")
+        print(f"DEBUG AveragedDB: set_id={set_id}, image_name={image_name}")
+        print(f"DEBUG AveragedDB: averaged_lab={averaged_lab}, averaged_rgb={averaged_rgb}")
+        print(f"DEBUG AveragedDB: source_measurements count={len(source_measurements)}")
+        print(f"DEBUG AveragedDB: notes={notes}")
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Calculate average position from source measurements
+                if source_measurements:
+                    avg_x = sum(m.get('x_position', 0) for m in source_measurements) / len(source_measurements)
+                    avg_y = sum(m.get('y_position', 0) for m in source_measurements) / len(source_measurements)
+                else:
+                    avg_x = avg_y = 0.0
+                
+                # Create source sample IDs string for reference
+                source_ids = ','.join(str(m.get('id', '')) for m in source_measurements if m.get('id'))
+                
+                # Use coordinate_point = 999 to indicate this is an averaged measurement
+                coordinate_point = 999
+                
+                # Create notes that include averaging information
+                avg_notes = f"Averaged from {len(source_measurements)} samples"
+                if notes:
+                    avg_notes += f": {notes}"
+                
+                # Analyze sample parameters from source measurements
+                sample_types = [m.get('sample_type', '') for m in source_measurements if m.get('sample_type')]
+                sample_sizes = [m.get('sample_size', '') for m in source_measurements if m.get('sample_size')]
+                sample_anchors = [m.get('sample_anchor', '') for m in source_measurements if m.get('sample_anchor')]
+                
+                # Determine aggregated values
+                if sample_types:
+                    unique_types = set(sample_types)
+                    avg_sample_type = sample_types[0] if len(unique_types) == 1 else 'various'
+                else:
+                    avg_sample_type = 'averaged'
+                
+                if sample_sizes:
+                    unique_sizes = set(sample_sizes)
+                    avg_sample_size = sample_sizes[0] if len(unique_sizes) == 1 else 'various'
+                else:
+                    avg_sample_size = '20'
+                
+                if sample_anchors:
+                    unique_anchors = set(sample_anchors)
+                    avg_sample_anchor = sample_anchors[0] if len(unique_anchors) == 1 else 'various'
+                else:
+                    avg_sample_anchor = 'center'
+                
+                print(f"DEBUG AveragedDB: Averaging sample parameters - types: {set(sample_types)}, sizes: {set(sample_sizes)}, anchors: {set(sample_anchors)}")
+                print(f"DEBUG AveragedDB: Result - type: {avg_sample_type}, size: {avg_sample_size}, anchor: {avg_sample_anchor}")
+                
+                # Insert averaged measurement
+                conn.execute("""
+                    INSERT INTO color_measurements (
+                        set_id, coordinate_point, x_position, y_position,
+                        l_value, a_value, b_value, rgb_r, rgb_g, rgb_b,
+                        sample_type, sample_size, sample_anchor, notes,
+                        is_averaged, source_samples_count, source_sample_ids
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    set_id, coordinate_point, avg_x, avg_y,
+                    averaged_lab[0], averaged_lab[1], averaged_lab[2],
+                    averaged_rgb[0], averaged_rgb[1], averaged_rgb[2],
+                    avg_sample_type, avg_sample_size, avg_sample_anchor, avg_notes,
+                    1, len(source_measurements), source_ids
+                ))
+                
+                print(f"AveragedDB: Saved averaged measurement from {len(source_measurements)} samples for image '{image_name}'")
+                return True
+                
+        except sqlite3.Error as e:
+            print(f"Error saving averaged measurement to averages database: {e}")
+            return False

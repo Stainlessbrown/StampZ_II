@@ -405,11 +405,9 @@ class ColorLibraryManager:
             display_frame = ttk.Frame(self.scroll_manager.content_frame)
             display_frame.pack(fill=tk.X, pady=1, padx=2, expand=True)
             
-            # Show color information
-            color_info = (
-                    f"L*a*b*: {color.lab[0]:.1f}, {color.lab[1]:.1f}, {color.lab[2]:.1f}\n"
-                    f"RGB: {color.rgb[0]:.0f}, {color.rgb[1]:.0f}, {color.rgb[2]:.0f}"
-                )
+            # Show color information based on user preferences
+            from utils.color_display_utils import get_conditional_color_info
+            color_info = get_conditional_color_info(color.rgb, color.lab)
 
             # Color display on left - simplified
             color_display = ColorDisplay(

@@ -165,7 +165,7 @@ class ReorganizedControlPanel(ttk.Frame):
         
         ttk.Label(file_row, text="File:", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
         ttk.Label(file_row, textvariable=self.current_filename, 
-                 foreground="gray", font=('Arial', 12, 'italic')).pack(side=tk.LEFT, padx=(3, 0))
+                 foreground="black", font=('Arial', 14, 'italic')).pack(side=tk.LEFT, padx=(3, 0))
         
         # SECTION 3: Coordinates and Zoom (super compressed)
         coord_row = ttk.Frame(self)

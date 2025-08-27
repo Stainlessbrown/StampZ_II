@@ -36,6 +36,7 @@ class FileDialogPreferences:
 class ColorLibraryPreferences:
     """Preferences for color library system."""
     default_library: str = "basic_colors"  # Default color library to use
+    hide_non_selected_standards: bool = False  # Hide non-selected standard values in Compare and Libraries
 
 
 @dataclass
@@ -294,6 +295,24 @@ class PreferencesManager:
             print(f"Error setting default color library: {e}")
             return False
     
+    def get_hide_non_selected_standards(self) -> bool:
+        """Get whether to hide non-selected standard values in Compare and Libraries."""
+        return self.preferences.color_library_prefs.hide_non_selected_standards
+    
+    def set_hide_non_selected_standards(self, hide: bool) -> bool:
+        """Set whether to hide non-selected standard values in Compare and Libraries.
+        
+        Args:
+            hide: True to hide non-selected values, False to show all values
+        """
+        try:
+            self.preferences.color_library_prefs.hide_non_selected_standards = hide
+            self.save_preferences()
+            return True
+        except Exception as e:
+            print(f"Error setting hide non-selected standards preference: {e}")
+            return False
+    
     def get_available_color_libraries(self) -> List[str]:
         """Get a list of available color libraries."""
         try:
@@ -481,7 +500,8 @@ class PreferencesManager:
                 if 'color_library_prefs' in data:
                     library_data = data['color_library_prefs']
                     self.preferences.color_library_prefs = ColorLibraryPreferences(
-                        default_library=library_data.get('default_library', 'basic_colors')
+                        default_library=library_data.get('default_library', 'basic_colors'),
+                        hide_non_selected_standards=library_data.get('hide_non_selected_standards', False)
                     )
                 
                 # Load sample area preferences

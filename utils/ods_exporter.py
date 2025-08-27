@@ -428,7 +428,11 @@ class ODSExporter:
         return f"{(ab_value + 128.0)/255.0:.4f}"
     
     def _get_export_headers(self, use_normalized: bool) -> List[str]:
-        """Get column headers based on normalization and color space preferences."""
+        """Get column headers based on normalization and color space preferences.
+        
+        Clean export format with only individual measurement columns.
+        Averaged data is now exported to separate spreadsheets.
+        """
         headers = []
         
         # Get color space preferences
@@ -446,7 +450,7 @@ class ODSExporter:
                 headers.extend(["L*", "a*", "b*"])
         
         # Common columns
-        headers.extend(["Filename_Timestamp", "X", "Y", "Shape", "Size", "Anchor"])
+        headers.extend(["DataID", "X", "Y", "Shape", "Size", "Anchor"])
         
         if include_rgb:
             if use_normalized:
@@ -454,30 +458,17 @@ class ODSExporter:
             else:
                 headers.extend(["R", "G", "B"])
         
-        # More common columns
-        headers.extend(["DataID_2", "Date", "Notes", "Calculations"])
-        
-        # Averaged values columns
-        if include_lab:
-            if use_normalized:
-                headers.extend(["L*_avg_norm", "a*_avg_norm", "b*_avg_norm"])
-            else:
-                headers.extend(["L*_avg", "a*_avg", "b*_avg"])
-        
-        headers.append("DataID")  # DataID for averaged data
-        
-        if include_rgb:
-            if use_normalized:
-                headers.extend(["R_avg_norm", "G_avg_norm", "B_avg_norm"])
-            else:
-                headers.extend(["R_avg", "G_avg", "B_avg"])
-        
-        headers.append("Analysis")  # Final column
+        # Final columns
+        headers.extend(["Date", "Notes", "Analysis"])
         
         return headers
     
     def _format_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
-        """Format measurement values based on normalization and color space preferences."""
+        """Format measurement values based on normalization and color space preferences.
+        
+        Clean format with only individual measurement columns.
+        Averaged data is now exported to separate spreadsheets.
+        """
         
         # Get color space preferences
         include_rgb = True
@@ -485,15 +476,6 @@ class ODSExporter:
         if self.prefs_manager:
             include_rgb = self.prefs_manager.get_export_include_rgb()
             include_lab = self.prefs_manager.get_export_include_lab()
-        
-        # Get averaged values if they exist (stored as attributes)
-        l_avg = getattr(measurement, 'l_avg', '')
-        a_avg = getattr(measurement, 'a_avg', '')
-        b_avg = getattr(measurement, 'b_avg', '')
-        r_avg = getattr(measurement, 'r_avg', '')
-        g_avg = getattr(measurement, 'g_avg', '')
-        rgb_b_avg = getattr(measurement, 'rgb_b_avg', '')
-        avg_data_id = getattr(measurement, 'avg_data_id', '')
         
         # Build row data dynamically based on preferences
         row_data = []
@@ -515,12 +497,12 @@ class ODSExporter:
         
         # Common columns
         row_data.extend([
-            measurement.data_id,  # Filename_Timestamp (individual sample ID)
-            f"{measurement.x_position:.1f}",
-            f"{measurement.y_position:.1f}",
-            measurement.sample_shape,
-            measurement.sample_size,
-            measurement.sample_anchor
+            measurement.data_id,  # DataID
+            f"{measurement.x_position:.1f}",  # X
+            f"{measurement.y_position:.1f}",  # Y
+            measurement.sample_shape,         # Shape
+            measurement.sample_size,          # Size
+            measurement.sample_anchor         # Anchor
         ])
         
         # Individual measurement RGB values
@@ -538,45 +520,12 @@ class ODSExporter:
                     f"{measurement.rgb_b:.2f}"
                 ])
         
-        # More common columns
+        # Final columns
         row_data.extend([
-            measurement.data_id,  # Duplicate DataID column
-            measurement.measurement_date,
-            measurement.notes or '',
-            ''  # Calculations column
+            measurement.measurement_date,     # Date
+            measurement.notes or '',          # Notes
+            ''                               # Analysis (empty for user notes)
         ])
-        
-        # Averaged L*a*b* values
-        if include_lab:
-            if use_normalized:
-                l_avg_norm = self._normalize_lab_l(l_avg) if l_avg != '' else ''
-                a_avg_norm = self._normalize_lab_ab(a_avg) if a_avg != '' else ''
-                b_avg_norm = self._normalize_lab_ab(b_avg) if b_avg != '' else ''
-                row_data.extend([l_avg_norm, a_avg_norm, b_avg_norm])
-            else:
-                l_avg_str = f"{l_avg:.2f}" if l_avg != '' else ''
-                a_avg_str = f"{a_avg:.2f}" if a_avg != '' else ''
-                b_avg_str = f"{b_avg:.2f}" if b_avg != '' else ''
-                row_data.extend([l_avg_str, a_avg_str, b_avg_str])
-        
-        # DataID for averaged data
-        row_data.append(avg_data_id)
-        
-        # Averaged RGB values
-        if include_rgb:
-            if use_normalized:
-                r_avg_norm = self._normalize_rgb(r_avg) if r_avg != '' else ''
-                g_avg_norm = self._normalize_rgb(g_avg) if g_avg != '' else ''
-                rgb_b_avg_norm = self._normalize_rgb(rgb_b_avg) if rgb_b_avg != '' else ''
-                row_data.extend([r_avg_norm, g_avg_norm, rgb_b_avg_norm])
-            else:
-                r_avg_str = f"{r_avg:.2f}" if r_avg != '' else ''
-                g_avg_str = f"{g_avg:.2f}" if g_avg != '' else ''
-                rgb_b_avg_str = f"{rgb_b_avg:.2f}" if rgb_b_avg != '' else ''
-                row_data.extend([r_avg_str, g_avg_str, rgb_b_avg_str])
-        
-        # Final analysis column
-        row_data.append('')  # Analysis column
         
         return row_data
     
@@ -618,8 +567,36 @@ class ODSExporter:
             # Create cells for each column using normalized or standard formatting
             data = self._format_measurement_values(measurement, use_normalized)
             
-            # Define which columns contain numeric data
-            numeric_columns = [0, 1, 2, 4, 5, 9, 10, 11]  # L*, a*, b*, X, Y, R, G, B
+            # Define which columns contain numeric data based on new clean structure
+            # L*, a*, b*, X, Y, R, G, B (positions depend on Lab/RGB preferences)
+            numeric_columns = []
+            col_index = 0
+            
+            # Get preferences for dynamic column mapping
+            include_rgb = True
+            include_lab = True
+            if self.prefs_manager:
+                include_rgb = self.prefs_manager.get_export_include_rgb()
+                include_lab = self.prefs_manager.get_export_include_lab()
+            
+            # L*a*b* columns (0,1,2)
+            if include_lab:
+                numeric_columns.extend([col_index, col_index+1, col_index+2])
+                col_index += 3
+            
+            # Skip DataID column
+            col_index += 1
+            
+            # X, Y columns
+            numeric_columns.extend([col_index, col_index+1])
+            col_index += 2
+            
+            # Skip Shape, Size, Anchor columns
+            col_index += 3
+            
+            # RGB columns
+            if include_rgb:
+                numeric_columns.extend([col_index, col_index+1, col_index+2])
             
             for i, value in enumerate(data):
                 cell = TableCell()
@@ -710,61 +687,18 @@ class ODSExporter:
                 else:
                     print("DEBUG: Using standard export format for XLSX")
             
-            # Convert measurements to DataFrame
+            # Convert measurements to DataFrame using clean header structure
             data = []
             for measurement in measurements:
-                # Determine if this is an averaged measurement
-                averages_info = ''
-                if measurement.is_averaged:
-                    if measurement.source_samples_count:
-                        averages_info = f"AVERAGE of {measurement.source_samples_count} samples"
-                    else:
-                        averages_info = "AVERAGE"
+                # Create row using same format as cleaned headers
+                formatted_data = self._format_measurement_values(measurement, use_normalized)
+                headers = self._get_export_headers(use_normalized)
                 
-                if use_normalized:
-                    # Use normalized values
-                    data.append({
-                        'L*_norm': float(self._normalize_lab_l(measurement.l_value)),
-                        'a*_norm': float(self._normalize_lab_ab(measurement.a_value)),
-                        'b*_norm': float(self._normalize_lab_ab(measurement.b_value)),
-                        'DataID': measurement.data_id,
-                        'X': measurement.x_position,
-                        'Y': measurement.y_position,
-                        'Shape': measurement.sample_shape,
-                        'Size': measurement.sample_size,
-                        'Anchor': measurement.sample_anchor,
-                        'R_norm': float(self._normalize_rgb(measurement.rgb_r)),
-                        'G_norm': float(self._normalize_rgb(measurement.rgb_g)),
-                        'B_norm': float(self._normalize_rgb(measurement.rgb_b)),
-                        'DataID_2': measurement.data_id,  # Duplicate column for compatibility
-                        'Date': measurement.measurement_date,
-                        'Notes': measurement.notes or '',
-                        'Calculations': '',  # Empty column for user calculations
-                        'Averages': averages_info,  # Show if this is an average
-                        'Analysis': ''       # Empty column for user analysis
-                    })
-                else:
-                    # Use standard values
-                    data.append({
-                        'L*': measurement.l_value,
-                        'a*': measurement.a_value,
-                        'b*': measurement.b_value,
-                        'DataID': measurement.data_id,
-                        'X': measurement.x_position,
-                        'Y': measurement.y_position,
-                        'Shape': measurement.sample_shape,
-                        'Size': measurement.sample_size,
-                        'Anchor': measurement.sample_anchor,
-                        'R': measurement.rgb_r,
-                        'G': measurement.rgb_g,
-                        'B': measurement.rgb_b,
-                        'DataID_2': measurement.data_id,  # Duplicate column for compatibility
-                        'Date': measurement.measurement_date,
-                        'Notes': measurement.notes or '',
-                        'Calculations': '',  # Empty column for user calculations
-                        'Averages': averages_info,  # Show if this is an average
-                        'Analysis': ''       # Empty column for user analysis
-                    })
+                row_dict = {}
+                for header, value in zip(headers, formatted_data):
+                    row_dict[header] = value
+                
+                data.append(row_dict)
             
             df = pd.DataFrame(data)
             
@@ -1009,28 +943,369 @@ class ODSExporter:
         except Exception as e:
             print(f"DEBUG: Failed to bring LibreOffice to front: {e}")
     
-    def export_and_open(self, output_path: str = None) -> bool:
-        """Export to ODS and conditionally open based on user preferences."""
-        if output_path is None:
-            output_path = self.export_with_timestamp()
-        else:
-            success = self.export_to_ods(output_path)
-            if not success:
-                return False
+    def export_averaged_measurements_only(self, sample_set_name: str = None) -> str:
+        """Export ONLY averaged measurements to a separate spreadsheet with _averages suffix.
         
-        if output_path:
-            # Check user preferences for auto-opening
-            should_auto_open = True  # Default behavior
-            if self.prefs_manager:
-                should_auto_open = self.prefs_manager.preferences.export_prefs.auto_open_after_export
-                print(f"DEBUG ODSExporter: Auto-open preference: {should_auto_open}")
+        Args:
+            sample_set_name: Name of the sample set. If None, uses self.sample_set_name
             
-            if should_auto_open:
-                return self.open_file_with_default_app(output_path)
+        Returns:
+            Path to exported file, or None if export failed
+        """
+        try:
+            if not sample_set_name:
+                sample_set_name = self.sample_set_name
+                
+            if not sample_set_name:
+                print("ERROR: No sample set name provided for averaged measurements export")
+                return None
+            
+            print(f"DEBUG: Exporting averaged measurements for sample set: {sample_set_name}")
+            
+            from utils.color_analysis_db import ColorAnalysisDB
+            
+            # Get averaged measurements from the separate _averages database
+            averaged_db_name = f"{sample_set_name}_averages"
+            print(f"DEBUG: Reading averaged measurements from database: {averaged_db_name}")
+            color_db = ColorAnalysisDB(averaged_db_name)
+            all_measurements = color_db.get_all_measurements()
+            
+            # Filter for averaged measurements only
+            averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
+            
+            if not averaged_measurements:
+                print(f"No averaged measurements found for sample set '{sample_set_name}'")
+                return None
+            
+            print(f"Found {len(averaged_measurements)} averaged measurements")
+            
+            # Convert to ColorMeasurement objects
+            color_measurements = []
+            for i, measurement in enumerate(averaged_measurements):
+                # Extract proper image name (preserve full name like "138-S1-crp_1")
+                image_name = measurement['image_name']
+                # Keep the full image name, just remove file extension if present
+                if '.' in image_name:
+                    image_basename = os.path.splitext(image_name)[0]
+                else:
+                    image_basename = image_name
+                
+                # Extract timestamp from measurement_date
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(measurement['measurement_date'], '%Y-%m-%d %H:%M:%S')
+                    timestamp = date_obj.strftime('%Y%m%d_%H%M%S')
+                except:
+                    timestamp = measurement['measurement_date'].replace(' ', '_').replace(':', '').replace('-', '')
+                
+                # Create single DataID with proper formatting: ImageName_Timestamp_Averaged
+                data_id = f"{image_basename}_{timestamp}_Averaged"
+                
+                # Get coordinate details
+                sample_size_raw = measurement.get('sample_size', '20')
+                if sample_size_raw and 'x' in str(sample_size_raw):
+                    size_parts = str(sample_size_raw).split('x')
+                    formatted_size = size_parts[0] if size_parts else '20'
+                else:
+                    formatted_size = str(sample_size_raw) if sample_size_raw else '20'
+                
+                color_measurement = ColorMeasurement(
+                    data_id=data_id,
+                    sample_set_number=1,  # Always 1 for averaged data
+                    coordinate_point=999,  # Special coordinate point for averages
+                    l_value=measurement['l_value'],
+                    a_value=measurement['a_value'],
+                    b_value=measurement['b_value'],
+                    rgb_r=measurement['rgb_r'],
+                    rgb_g=measurement['rgb_g'],
+                    rgb_b=measurement['rgb_b'],
+                    x_position=measurement.get('x_position', 0.0),
+                    y_position=measurement.get('y_position', 0.0),
+                    sample_shape=measurement.get('sample_type', 'averaged'),
+                    sample_size=formatted_size,
+                    sample_anchor=measurement.get('sample_anchor', 'center'),
+                    measurement_date=measurement['measurement_date'],
+                    notes=measurement.get('notes', 'Averaged measurement'),
+                    is_averaged=True,
+                    source_samples_count=measurement.get('source_samples_count'),
+                    source_sample_ids=measurement.get('source_sample_ids')
+                )
+                
+                color_measurements.append(color_measurement)
+            
+            # Sort by date
+            color_measurements.sort(key=lambda x: x.measurement_date)
+            
+            # Determine output filename with _averages suffix
+            base_filename = f"{sample_set_name}_averages"
+            
+            # Get preferred format from preferences
+            format_type = "ods"  # Default
+            if self.prefs_manager:
+                format_type = self.prefs_manager.get_preferred_export_format()
+            
+            extension = f".{format_type}"
+            
+            # Determine output path
+            if self.prefs_manager:
+                export_dir = self.prefs_manager.get_export_directory()
+                filename = f"{base_filename}_{datetime.now().strftime('%Y%m%d')}{extension}"
+                output_path = os.path.join(export_dir, filename)
             else:
-                print(f"DEBUG ODSExporter: Auto-open disabled, file saved to: {output_path}")
-                return True  # Export was successful, just didn't open
-        return False
+                # Fallback path
+                stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+                if stampz_data_dir:
+                    output_path = os.path.join(stampz_data_dir, "exports", f"{base_filename}{extension}")
+                else:
+                    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    output_path = os.path.join(current_dir, "exports", f"{base_filename}{extension}")
+            
+            # Create the document
+            doc = self._create_averaged_document(color_measurements)
+            
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Export using the appropriate method
+            success = False
+            if format_type == "ods":
+                doc.save(output_path)
+                success = True
+            elif format_type == "xlsx":
+                success = self._export_averaged_to_xlsx(color_measurements, output_path)
+            elif format_type == "csv":
+                success = self._export_averaged_to_csv(color_measurements, output_path)
+            
+            if success:
+                print(f"Successfully exported {len(color_measurements)} averaged measurements to: {output_path}")
+                return output_path
+            else:
+                print(f"Failed to export averaged measurements")
+                return None
+                
+        except Exception as e:
+            print(f"Error exporting averaged measurements: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _create_averaged_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
+        """Create an ODS document specifically for averaged measurements."""
+        if not ODF_AVAILABLE:
+            raise RuntimeError("odfpy library not available. Cannot create ODS document.")
+        
+        # Check normalization preference
+        use_normalized = False
+        if self.prefs_manager:
+            use_normalized = self.prefs_manager.get_export_normalized_values()
+        
+        # Create new document
+        doc = OpenDocumentSpreadsheet()
+        
+        # Create table
+        table = Table(name="Averaged Color Analysis")
+        
+        # Define headers for averaged measurements
+        headers = self._get_averaged_export_headers(use_normalized)
+        
+        # Add header row
+        header_row = TableRow()
+        for header in headers:
+            cell = TableCell()
+            cell.addElement(P(text=header))
+            header_row.addElement(cell)
+        table.addElement(header_row)
+        
+        # Add data rows
+        for measurement in measurements:
+            row = TableRow()
+            data = self._format_averaged_measurement_values(measurement, use_normalized)
+            
+            for i, value in enumerate(data):
+                cell = TableCell()
+                
+                # Set proper value type for numeric columns
+                if i < 6 and value and value != "":  # L*, a*, b*, R, G, B are first 6 columns
+                    try:
+                        numeric_value = float(value)
+                        cell.setAttribute('valuetype', 'float')
+                        cell.setAttribute('value', str(numeric_value))
+                        cell.addElement(P(text=value))
+                    except (ValueError, TypeError):
+                        cell.addElement(P(text=str(value)))
+                else:
+                    cell.addElement(P(text=str(value)))
+                
+                row.addElement(cell)
+            
+            table.addElement(row)
+        
+        # Add table to document
+        doc.spreadsheet.addElement(table)
+        
+        return doc
+    
+    def _get_averaged_export_headers(self, use_normalized: bool) -> List[str]:
+        """Get column headers for averaged measurements export."""
+        headers = []
+        
+        # Get color space preferences
+        include_rgb = True
+        include_lab = True
+        if self.prefs_manager:
+            include_rgb = self.prefs_manager.get_export_include_rgb()
+            include_lab = self.prefs_manager.get_export_include_lab()
+        
+        # L*a*b* values
+        if include_lab:
+            if use_normalized:
+                headers.extend(["L*_avg_norm", "a*_avg_norm", "b*_avg_norm"])
+            else:
+                headers.extend(["L*_avg", "a*_avg", "b*_avg"])
+        
+        # RGB values
+        if include_rgb:
+            if use_normalized:
+                headers.extend(["R_avg_norm", "G_avg_norm", "B_avg_norm"])
+            else:
+                headers.extend(["R_avg", "G_avg", "B_avg"])
+        
+        # Other columns
+        headers.extend([
+            "DataID_avg",
+            "Source_Samples_Count",
+            "Date",
+            "Notes",
+            "Analysis"
+        ])
+        
+        return headers
+    
+    def _format_averaged_measurement_values(self, measurement: ColorMeasurement, use_normalized: bool) -> List[str]:
+        """Format averaged measurement values for export."""
+        row_data = []
+        
+        # Get color space preferences
+        include_rgb = True
+        include_lab = True
+        if self.prefs_manager:
+            include_rgb = self.prefs_manager.get_export_include_rgb()
+            include_lab = self.prefs_manager.get_export_include_lab()
+        
+        # L*a*b* values
+        if include_lab:
+            if use_normalized:
+                row_data.extend([
+                    self._normalize_lab_l(measurement.l_value),
+                    self._normalize_lab_ab(measurement.a_value),
+                    self._normalize_lab_ab(measurement.b_value)
+                ])
+            else:
+                row_data.extend([
+                    f"{measurement.l_value:.2f}",
+                    f"{measurement.a_value:.2f}",
+                    f"{measurement.b_value:.2f}"
+                ])
+        
+        # RGB values
+        if include_rgb:
+            if use_normalized:
+                row_data.extend([
+                    self._normalize_rgb(measurement.rgb_r),
+                    self._normalize_rgb(measurement.rgb_g),
+                    self._normalize_rgb(measurement.rgb_b)
+                ])
+            else:
+                row_data.extend([
+                    f"{measurement.rgb_r:.2f}",
+                    f"{measurement.rgb_g:.2f}",
+                    f"{measurement.rgb_b:.2f}"
+                ])
+        
+        # Other columns
+        sample_count_text = f"{measurement.source_samples_count} samples" if measurement.source_samples_count else "Multiple samples"
+        
+        row_data.extend([
+            measurement.data_id,
+            sample_count_text,
+            measurement.measurement_date,
+            measurement.notes or 'Averaged color measurement',
+            ''  # Analysis column for user notes
+        ])
+        
+        return row_data
+    
+    def _export_averaged_to_xlsx(self, measurements: List[ColorMeasurement], output_path: str) -> bool:
+        """Export averaged measurements to Excel format."""
+        try:
+            import pandas as pd
+        except ImportError:
+            print("Error: pandas library not available for XLSX export")
+            return False
+        
+        try:
+            use_normalized = False
+            if self.prefs_manager:
+                use_normalized = self.prefs_manager.get_export_normalized_values()
+            
+            # Convert measurements to DataFrame
+            data = []
+            for measurement in measurements:
+                row_dict = {}
+                formatted_data = self._format_averaged_measurement_values(measurement, use_normalized)
+                headers = self._get_averaged_export_headers(use_normalized)
+                
+                for header, value in zip(headers, formatted_data):
+                    row_dict[header] = value
+                
+                data.append(row_dict)
+            
+            df = pd.DataFrame(data)
+            
+            # Save to Excel
+            with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='Averaged Color Analysis', index=False)
+                
+                # Auto-adjust column widths
+                worksheet = writer.sheets['Averaged Color Analysis']
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            
+            return True
+        except Exception as e:
+            print(f"Error exporting averaged measurements to XLSX: {e}")
+            return False
+    
+    def _export_averaged_to_csv(self, measurements: List[ColorMeasurement], output_path: str) -> bool:
+        """Export averaged measurements to CSV format."""
+        try:
+            use_normalized = False
+            if self.prefs_manager:
+                use_normalized = self.prefs_manager.get_export_normalized_values()
+            
+            headers = self._get_averaged_export_headers(use_normalized)
+            
+            with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(headers)
+                
+                for measurement in measurements:
+                    row = self._format_averaged_measurement_values(measurement, use_normalized)
+                    writer.writerow(row)
+            
+            return True
+        except Exception as e:
+            print(f"Error exporting averaged measurements to CSV: {e}")
+            return False
     
     def get_latest_export_file(self) -> str:
         """Get the path to the most recent export file."""
@@ -1062,6 +1337,63 @@ class ODSExporter:
         if output_file:
             return self.open_file_with_default_app(output_file)
         return False
+    
+    def view_averaged_measurements_spreadsheet(self) -> bool:
+        """Export averaged measurements to spreadsheet and open it.
+        
+        Returns:
+            True if export and open succeeded, False otherwise
+        """
+        try:
+            # Export averaged measurements to spreadsheet
+            output_path = self.export_averaged_measurements_only(self.sample_set_name)
+            
+            if output_path:
+                # Try to open the file
+                success = self.open_file_with_default_app(output_path)
+                if success:
+                    print(f"Successfully exported and opened averaged measurements: {os.path.basename(output_path)}")
+                return success
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Error viewing averaged measurements: {e}")
+            return False
+    
+    def export_and_open_averaged_measurements(self, sample_set_name: str = None) -> bool:
+        """Export averaged measurements to separate spreadsheet and open it.
+        
+        Args:
+            sample_set_name: Name of the sample set. If None, uses self.sample_set_name
+            
+        Returns:
+            True if export and open succeeded, False otherwise
+        """
+        try:
+            output_path = self.export_averaged_measurements_only(sample_set_name)
+            
+            if output_path:
+                # Check user preferences for auto-opening
+                should_auto_open = True  # Default behavior
+                if self.prefs_manager:
+                    should_auto_open = self.prefs_manager.preferences.export_prefs.auto_open_after_export
+                    print(f"DEBUG ODSExporter: Auto-open preference: {should_auto_open}")
+                
+                if should_auto_open:
+                    success = self.open_file_with_default_app(output_path)
+                    if success:
+                        print(f"Successfully exported and opened averaged measurements: {os.path.basename(output_path)}")
+                    return success
+                else:
+                    print(f"DEBUG ODSExporter: Auto-open disabled, averaged file saved to: {output_path}")
+                    return True  # Export was successful, just didn't open
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Error exporting and opening averaged measurements: {e}")
+            return False
 
 def main():
     """Test the exporter."""

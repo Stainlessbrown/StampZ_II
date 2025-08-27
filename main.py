@@ -123,6 +123,7 @@ class StampZApp:
         self.color_menu.add_command(label="Create Standard Libraries", command=self.create_standard_libraries)
         self.color_menu.add_separator()
         self.color_menu.add_command(label="Spectral Analysis...", command=self.open_spectral_analysis)
+        self.color_menu.add_command(label="3D Color Space Analysis...", command=self.open_3d_analysis)
         self.color_menu.add_command(label="Export Analysis with Library Matches...", command=self.export_with_library_matches)
 
         self.help_menu = tk.Menu(self.menubar, tearoff=0)
@@ -513,7 +514,7 @@ class StampZApp:
         try:
             from __init__ import __version__, __app_name__, __description__
         except ImportError:
-            __version__ = "2.0.2"
+            __version__ = "2.0.3"
             __app_name__ = "StampZ_II"
             __description__ = "Image analysis and color analysis tool"
         
@@ -958,7 +959,7 @@ class StampZApp:
             listbox_frame = Frame(sets_frame)
             listbox_frame.pack(fill="both", expand=True, pady=5)
             
-            sets_listbox = Listbox(listbox_frame, font=("Arial", 11))
+            sets_listbox = Listbox(listbox_frame, font=("Arial", 13, "bold"))
             sets_listbox.pack(side="left", fill="both", expand=True)
             
             scrollbar = Scrollbar(listbox_frame)
@@ -1025,8 +1026,18 @@ class StampZApp:
             if selected_option == "specific" and selected_sample_set:
                 print(f"DEBUG: User selected specific sample set: {selected_sample_set}")
                 from utils.ods_exporter import ODSExporter
-                exporter = ODSExporter(sample_set_name=selected_sample_set)
-                success = exporter.view_latest_spreadsheet()
+                
+                # Check if this is an averages database
+                if selected_sample_set.endswith('_averages'):
+                    # For averaged measurements, extract the base name and use the specialized method
+                    base_name = selected_sample_set[:-9]  # Remove '_averages' suffix
+                    print(f"DEBUG: Detected averages database, base name: {base_name}")
+                    exporter = ODSExporter(sample_set_name=base_name)
+                    success = exporter.view_averaged_measurements_spreadsheet()
+                else:
+                    # For regular individual measurements
+                    exporter = ODSExporter(sample_set_name=selected_sample_set)
+                    success = exporter.view_latest_spreadsheet()
                 
                 if not success:
                     messagebox.showerror(
@@ -3009,6 +3020,258 @@ class StampZApp:
             print(f"DEBUG: Error refreshing display: {e}")
             import traceback
             traceback.print_exc()
+
+    def open_3d_analysis(self):
+        """Open 3D color space analysis tool."""
+        try:
+            # Import Plot_3D module
+            from plot3d.Plot_3D import Plot3DApp
+            
+            # Get current sample set name
+            current_sample_set = None
+            if (hasattr(self, 'control_panel') and 
+                hasattr(self.control_panel, 'sample_set_name') and 
+                self.control_panel.sample_set_name.get().strip()):
+                current_sample_set = self.control_panel.sample_set_name.get().strip()
+            
+            # Check if we have data to analyze
+            if current_sample_set:
+                # Try to get color data from StampZ database
+                try:
+                    from utils.color_analysis_db import ColorAnalysisDB
+                    db = ColorAnalysisDB(current_sample_set)
+                    measurements = db.get_all_measurements()
+                    
+                    if measurements:
+                        # Export StampZ data to temporary CSV file for Plot_3D
+                        temp_csv_path = self._export_data_for_plot3d(current_sample_set, measurements)
+                        
+                        if temp_csv_path and os.path.exists(temp_csv_path):
+                            # Launch Plot_3D with exported data
+                            messagebox.showinfo(
+                                "3D Analysis",
+                                f"Launching 3D color analysis with {len(measurements)} measurements from '{current_sample_set}'.\n\n"
+                                "The 3D analysis window will open shortly."
+                            )
+                            
+                            # Create Plot_3D app instance with exported data
+                            plot_app = Plot3DApp(parent=self.root, data_path=temp_csv_path)
+                        else:
+                            messagebox.showerror(
+                                "Export Error",
+                                "Failed to export data for 3D analysis. Please try again."
+                            )
+                    else:
+                        messagebox.showinfo(
+                            "No Analysis Data",
+                            f"No color analysis data found for sample set '{current_sample_set}'.\n\n"
+                            "Please run color analysis first using the Sample tool."
+                        )
+                except Exception as e:
+                    print(f"Error accessing analysis data: {e}")
+                    messagebox.showerror(
+                        "Data Error",
+                        f"Could not access analysis data for '{current_sample_set}'.\n\n"
+                        f"Error: {str(e)}"
+                    )
+            else:
+                # No current sample set - launch Plot_3D in standalone mode (with file dialog)
+                messagebox.showinfo(
+                    "3D Analysis",
+                    "Launching 3D color analysis tool.\n\n"
+                    "You can load existing data files or import from spreadsheets."
+                )
+                
+                # Create Plot_3D app instance without data_path to trigger file dialog
+                plot_app = Plot3DApp(parent=self.root)
+                
+        except ImportError as e:
+            messagebox.showerror(
+                "Import Error",
+                f"Could not load 3D analysis module:\n\n{str(e)}\n\n"
+                "Please ensure all Plot_3D components are properly installed."
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Launch Error",
+                f"Failed to launch 3D analysis:\n\n{str(e)}"
+            )
+    
+    def _export_data_for_plot3d(self, sample_set_name, measurements):
+        """Export StampZ color analysis data to CSV format compatible with Plot_3D.
+        
+        Args:
+            sample_set_name (str): Name of the sample set
+            measurements (list): List of color measurement dictionaries
+            
+        Returns:
+            str: Path to exported CSV file, or None if export failed
+        """
+        try:
+            import csv
+            import tempfile
+            from datetime import datetime
+            from utils.color_analysis_db import ColorAnalysisDB
+            
+            # Create temporary CSV file
+            temp_dir = tempfile.gettempdir()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            csv_filename = f"stampz_{sample_set_name}_{timestamp}.csv"
+            csv_path = os.path.join(temp_dir, csv_filename)
+            
+            # Get fresh data from database including averaged measurements
+            db = ColorAnalysisDB(sample_set_name)
+            all_measurements = db.get_all_measurements()
+            
+            # Separate individual measurements from averaged measurements
+            individual_measurements = [m for m in all_measurements if not m.get('is_averaged', False)]
+            averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
+            
+            print(f"DEBUG: Found {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
+            
+            # Calculate averaged values for each image
+            averaged_values = {}
+            if averaged_measurements:
+                # Use the most recent averaged measurement for each image
+                latest_averages = {}
+                for avg_m in averaged_measurements:
+                    image_name = avg_m['image_name']
+                    if image_name not in latest_averages or avg_m['measurement_date'] > latest_averages[image_name]['measurement_date']:
+                        latest_averages[image_name] = avg_m
+                
+                # Store averaged values using flexible image name matching
+                # We need to match averaged measurements (which may have full filenames like '138-S1-crp_1')
+                # with individual measurements (which may have base names like 'S1')
+                for avg_image_name, avg_m in latest_averages.items():
+                    # Store averaged values with flexible key matching
+                    # Try to find matching individual measurements to determine the correct key
+                    matched_individual_name = None
+                    for ind_m in individual_measurements:
+                        ind_image_name = ind_m.get('image_name', '')
+                        # Try flexible matching between averaged and individual image names
+                        if (avg_image_name == ind_image_name or 
+                            (avg_image_name and ind_image_name and ind_image_name in avg_image_name) or
+                            (avg_image_name and ind_image_name and avg_image_name in ind_image_name)):
+                            matched_individual_name = ind_image_name
+                            break
+                    
+                    # Use the matched individual name as the key, or fall back to averaged name
+                    key_name = matched_individual_name if matched_individual_name else avg_image_name
+                    
+                    averaged_values[key_name] = {
+                        'l_avg': avg_m['l_value'],
+                        'a_avg': avg_m['a_value'], 
+                        'b_avg': avg_m['b_value'],
+                        'r_avg': avg_m['rgb_r'],
+                        'g_avg': avg_m['rgb_g'],
+                        'b_avg_rgb': avg_m['rgb_b']  # Blue channel average
+                    }
+            
+            # Write CSV data in Plot_3D compatible format
+            with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                # Define CSV headers for Plot_3D compatibility (including averaged columns)
+                headers = [
+                    'DataID',          # Sample identifier
+                    'L_star',          # L* value
+                    'a_star',          # a* value 
+                    'b_star',          # b* value
+                    'L_avg',           # Averaged L* value (only in first row per image)
+                    'a_avg',           # Averaged a* value (only in first row per image)
+                    'b_avg',           # Averaged b* value (only in first row per image)
+                    'X_norm',          # Normalized X (for XYZ plots if needed)
+                    'Y_norm',          # Normalized Y
+                    'Z_norm',          # Normalized Z
+                    'RGB_R',           # RGB Red component
+                    'RGB_G',           # RGB Green component
+                    'RGB_B',           # RGB Blue component
+                    'R_avg',           # Averaged RGB Red (only in first row per image)
+                    'G_avg',           # Averaged RGB Green (only in first row per image)
+                    'B_avg',           # Averaged RGB Blue (only in first row per image)
+                    'Sample_Name',     # Descriptive name
+                    'Image_Name',      # Source image
+                    'X_Position',      # Sample X position
+                    'Y_Position'       # Sample Y position
+                ]
+                
+                writer = csv.DictWriter(csvfile, fieldnames=headers)
+                writer.writeheader()
+                
+                # Track which images have already shown their averaged values
+                images_with_averages_shown = set()
+                
+                # Sort measurements by image name and coordinate point for consistent ordering
+                sorted_measurements = sorted(individual_measurements, 
+                                           key=lambda x: (x['image_name'], x['coordinate_point']))
+                
+                # Convert StampZ measurements to Plot_3D format
+                for i, measurement in enumerate(sorted_measurements, 1):
+                    try:
+                        # Get Lab values
+                        l_val = measurement.get('l_value', 0.0)
+                        a_val = measurement.get('a_value', 0.0)
+                        b_val = measurement.get('b_value', 0.0)
+                        
+                        # Get RGB values
+                        r_val = measurement.get('rgb_r', 0)
+                        g_val = measurement.get('rgb_g', 0)
+                        b_val_rgb = measurement.get('rgb_b', 0)
+                        
+                        # Get averaged values for this image (if they exist)
+                        image_name = measurement['image_name']
+                        avg_values = averaged_values.get(image_name, {})
+                        
+                        # Only show averaged values on the first sample (coordinate_point 1) for each image
+                        show_averages = (image_name not in images_with_averages_shown and 
+                                       measurement['coordinate_point'] == 1 and 
+                                       avg_values)
+                        
+                        if show_averages:
+                            images_with_averages_shown.add(image_name)
+                        
+                        # Convert Lab to XYZ (simplified normalization)
+                        # This is a rough conversion for Plot_3D compatibility
+                        x_norm = (l_val + 16) / 116.0  # Simplified L* to Y conversion
+                        y_norm = l_val / 100.0         # L* as percentage
+                        z_norm = (l_val - b_val + 200) / 400.0  # Simplified b* to Z conversion
+                        
+                        # Create row data
+                        row_data = {
+                            'DataID': f"Sample_{i:03d}",
+                            'L_star': round(l_val, 2),
+                            'a_star': round(a_val, 2),
+                            'b_star': round(b_val, 2),
+                            'L_avg': round(avg_values.get('l_avg', 0), 2) if show_averages else '',
+                            'a_avg': round(avg_values.get('a_avg', 0), 2) if show_averages else '',
+                            'b_avg': round(avg_values.get('b_avg', 0), 2) if show_averages else '',
+                            'X_norm': round(x_norm, 4),
+                            'Y_norm': round(y_norm, 4),
+                            'Z_norm': round(z_norm, 4),
+                            'RGB_R': int(r_val),
+                            'RGB_G': int(g_val),
+                            'RGB_B': int(b_val_rgb),
+                            'R_avg': int(avg_values.get('r_avg', 0)) if show_averages else '',
+                            'G_avg': int(avg_values.get('g_avg', 0)) if show_averages else '',
+                            'B_avg': int(avg_values.get('b_avg_rgb', 0)) if show_averages else '',
+                            'Sample_Name': f"{sample_set_name}_Sample_{i}",
+                            'Image_Name': measurement.get('image_name', ''),
+                            'X_Position': round(measurement.get('x_position', 0.0), 1),
+                            'Y_Position': round(measurement.get('y_position', 0.0), 1)
+                        }
+                        
+                        writer.writerow(row_data)
+                        
+                    except Exception as e:
+                        print(f"Warning: Could not process measurement {i}: {e}")
+                        continue
+            
+            print(f"Successfully exported {len(measurements)} measurements to {csv_path}")
+            return csv_path
+            
+        except Exception as e:
+            print(f"Error exporting data for Plot_3D: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def open_database_viewer(self):
         from gui.database_viewer import DatabaseViewer
