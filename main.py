@@ -3100,6 +3100,14 @@ class StampZApp:
     def _export_data_for_plot3d(self, sample_set_name, measurements):
         """Export StampZ color analysis data to CSV format compatible with Plot_3D.
         
+        Plot_3D Format Requirements:
+        - Row 1: Headers (X_norm, Y_norm, Z_norm, DataID as first 4 columns)
+        - Rows 2-7: Empty dummy rows for K-means processing
+        - Row 8+: Actual data starts here
+        - Column G: Marker type validation table
+        - Column H: Color markers validation table  
+        - Column L: Color spheres validation table
+        
         Args:
             sample_set_name (str): Name of the sample set
             measurements (list): List of color measurement dictionaries
@@ -3119,91 +3127,62 @@ class StampZApp:
             csv_filename = f"stampz_{sample_set_name}_{timestamp}.csv"
             csv_path = os.path.join(temp_dir, csv_filename)
             
-            # Get fresh data from database including averaged measurements
+            # Get fresh data from database
             db = ColorAnalysisDB(sample_set_name)
             all_measurements = db.get_all_measurements()
             
-            # Separate individual measurements from averaged measurements
+            # Use individual measurements only (no averaged data for 3D plotting)
             individual_measurements = [m for m in all_measurements if not m.get('is_averaged', False)]
-            averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
             
-            print(f"DEBUG: Found {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
+            print(f"DEBUG: Found {len(individual_measurements)} individual measurements for Plot_3D export")
             
-            # Calculate averaged values for each image
-            averaged_values = {}
-            if averaged_measurements:
-                # Use the most recent averaged measurement for each image
-                latest_averages = {}
-                for avg_m in averaged_measurements:
-                    image_name = avg_m['image_name']
-                    if image_name not in latest_averages or avg_m['measurement_date'] > latest_averages[image_name]['measurement_date']:
-                        latest_averages[image_name] = avg_m
-                
-                # Store averaged values using flexible image name matching
-                # We need to match averaged measurements (which may have full filenames like '138-S1-crp_1')
-                # with individual measurements (which may have base names like 'S1')
-                for avg_image_name, avg_m in latest_averages.items():
-                    # Store averaged values with flexible key matching
-                    # Try to find matching individual measurements to determine the correct key
-                    matched_individual_name = None
-                    for ind_m in individual_measurements:
-                        ind_image_name = ind_m.get('image_name', '')
-                        # Try flexible matching between averaged and individual image names
-                        if (avg_image_name == ind_image_name or 
-                            (avg_image_name and ind_image_name and ind_image_name in avg_image_name) or
-                            (avg_image_name and ind_image_name and avg_image_name in ind_image_name)):
-                            matched_individual_name = ind_image_name
-                            break
-                    
-                    # Use the matched individual name as the key, or fall back to averaged name
-                    key_name = matched_individual_name if matched_individual_name else avg_image_name
-                    
-                    averaged_values[key_name] = {
-                        'l_avg': avg_m['l_value'],
-                        'a_avg': avg_m['a_value'], 
-                        'b_avg': avg_m['b_value'],
-                        'r_avg': avg_m['rgb_r'],
-                        'g_avg': avg_m['rgb_g'],
-                        'b_avg_rgb': avg_m['rgb_b']  # Blue channel average
-                    }
+            # Sort measurements by image name and coordinate point for consistent ordering
+            sorted_measurements = sorted(individual_measurements, 
+                                       key=lambda x: (x['image_name'], x['coordinate_point']))
+            
+            # Define Plot_3D format headers - first 4 columns are the data columns
+            headers = [
+                'X_norm',          # Column A - Normalized X coordinate (L* or R)
+                'Y_norm',          # Column B - Normalized Y coordinate (a* or G)
+                'Z_norm',          # Column C - Normalized Z coordinate (b* or B)
+                'DataID',          # Column D - Sample identifier
+                'E',               # Column E - (empty for now)
+                'F',               # Column F - (empty for now)
+                'G',               # Column G - Marker type validation table
+                'H',               # Column H - Color markers validation table
+                'I',               # Column I - (empty for now)
+                'J',               # Column J - (empty for now)
+                'K',               # Column K - (empty for now)
+                'L'                # Column L - Color spheres validation table
+            ]
+            
+            # Define marker type validation data for column G (from your existing Plot_3D format)
+            marker_types = ['^', '<', '>', 'v', 'o', 's', 'p', 'h', 'x', '*', 'D', '+']
+            
+            # Define color validation data for columns H and L (from your existing Plot_3D format)
+            color_names_h = ['red', 'green', 'blue', 'lime', 'blueviolet', 'purple', 'darkorange', 'black', 'orchid', 'deeppink']
+            color_names_l = ['red', 'green', 'blue', 'yellow', 'blueviolet', 'cyan', 'magenta', 'orange', 'purple', 'brown', 'pink', 'lime', 'navy', 'teal']
             
             # Write CSV data in Plot_3D compatible format
             with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-                # Define CSV headers for Plot_3D compatibility (including averaged columns)
-                headers = [
-                    'DataID',          # Sample identifier
-                    'L_star',          # L* value
-                    'a_star',          # a* value 
-                    'b_star',          # b* value
-                    'L_avg',           # Averaged L* value (only in first row per image)
-                    'a_avg',           # Averaged a* value (only in first row per image)
-                    'b_avg',           # Averaged b* value (only in first row per image)
-                    'X_norm',          # Normalized X (for XYZ plots if needed)
-                    'Y_norm',          # Normalized Y
-                    'Z_norm',          # Normalized Z
-                    'RGB_R',           # RGB Red component
-                    'RGB_G',           # RGB Green component
-                    'RGB_B',           # RGB Blue component
-                    'R_avg',           # Averaged RGB Red (only in first row per image)
-                    'G_avg',           # Averaged RGB Green (only in first row per image)
-                    'B_avg',           # Averaged RGB Blue (only in first row per image)
-                    'Sample_Name',     # Descriptive name
-                    'Image_Name',      # Source image
-                    'X_Position',      # Sample X position
-                    'Y_Position'       # Sample Y position
-                ]
-                
                 writer = csv.DictWriter(csvfile, fieldnames=headers)
+                
+                # Row 1: Write headers
                 writer.writeheader()
                 
-                # Track which images have already shown their averaged values
-                images_with_averages_shown = set()
+                # Rows 2-7: Write empty dummy rows for K-means (6 empty rows)
+                for dummy_row in range(6):
+                    empty_row = {header: '' for header in headers}
+                    # Add validation data to appropriate columns in dummy rows
+                    if dummy_row < len(marker_types):
+                        empty_row['G'] = marker_types[dummy_row]
+                    if dummy_row < len(color_names_h):
+                        empty_row['H'] = color_names_h[dummy_row]
+                    if dummy_row < len(color_names_l):
+                        empty_row['L'] = color_names_l[dummy_row]
+                    writer.writerow(empty_row)
                 
-                # Sort measurements by image name and coordinate point for consistent ordering
-                sorted_measurements = sorted(individual_measurements, 
-                                           key=lambda x: (x['image_name'], x['coordinate_point']))
-                
-                # Convert StampZ measurements to Plot_3D format
+                # Row 8+: Write actual measurement data
                 for i, measurement in enumerate(sorted_measurements, 1):
                     try:
                         # Get Lab values
@@ -3211,51 +3190,27 @@ class StampZApp:
                         a_val = measurement.get('a_value', 0.0)
                         b_val = measurement.get('b_value', 0.0)
                         
-                        # Get RGB values
-                        r_val = measurement.get('rgb_r', 0)
-                        g_val = measurement.get('rgb_g', 0)
-                        b_val_rgb = measurement.get('rgb_b', 0)
+                        # Normalize L*a*b* values for Plot_3D
+                        # L* is 0-100, normalize to 0-1
+                        x_norm = l_val / 100.0
+                        # a* and b* are typically -128 to +127, normalize to 0-1
+                        y_norm = (a_val + 128) / 256.0
+                        z_norm = (b_val + 128) / 256.0
                         
-                        # Get averaged values for this image (if they exist)
-                        image_name = measurement['image_name']
-                        avg_values = averaged_values.get(image_name, {})
-                        
-                        # Only show averaged values on the first sample (coordinate_point 1) for each image
-                        show_averages = (image_name not in images_with_averages_shown and 
-                                       measurement['coordinate_point'] == 1 and 
-                                       avg_values)
-                        
-                        if show_averages:
-                            images_with_averages_shown.add(image_name)
-                        
-                        # Convert Lab to XYZ (simplified normalization)
-                        # This is a rough conversion for Plot_3D compatibility
-                        x_norm = (l_val + 16) / 116.0  # Simplified L* to Y conversion
-                        y_norm = l_val / 100.0         # L* as percentage
-                        z_norm = (l_val - b_val + 200) / 400.0  # Simplified b* to Z conversion
-                        
-                        # Create row data
+                        # Create data row - only populate the first 4 columns with data
                         row_data = {
-                            'DataID': f"Sample_{i:03d}",
-                            'L_star': round(l_val, 2),
-                            'a_star': round(a_val, 2),
-                            'b_star': round(b_val, 2),
-                            'L_avg': round(avg_values.get('l_avg', 0), 2) if show_averages else '',
-                            'a_avg': round(avg_values.get('a_avg', 0), 2) if show_averages else '',
-                            'b_avg': round(avg_values.get('b_avg', 0), 2) if show_averages else '',
-                            'X_norm': round(x_norm, 4),
-                            'Y_norm': round(y_norm, 4),
-                            'Z_norm': round(z_norm, 4),
-                            'RGB_R': int(r_val),
-                            'RGB_G': int(g_val),
-                            'RGB_B': int(b_val_rgb),
-                            'R_avg': int(avg_values.get('r_avg', 0)) if show_averages else '',
-                            'G_avg': int(avg_values.get('g_avg', 0)) if show_averages else '',
-                            'B_avg': int(avg_values.get('b_avg_rgb', 0)) if show_averages else '',
-                            'Sample_Name': f"{sample_set_name}_Sample_{i}",
-                            'Image_Name': measurement.get('image_name', ''),
-                            'X_Position': round(measurement.get('x_position', 0.0), 1),
-                            'Y_Position': round(measurement.get('y_position', 0.0), 1)
+                            'X_norm': round(x_norm, 6),  # Normalized L*
+                            'Y_norm': round(y_norm, 6),  # Normalized a*
+                            'Z_norm': round(z_norm, 6),  # Normalized b*
+                            'DataID': f"{sample_set_name}_Sample_{i:03d}",
+                            'E': '',               # Empty
+                            'F': '',               # Empty
+                            'G': '',               # Empty (validation data only in rows 2-7)
+                            'H': '',               # Empty (validation data only in rows 2-7)
+                            'I': '',               # Empty
+                            'J': '',               # Empty
+                            'K': '',               # Empty
+                            'L': ''                # Empty (validation data only in rows 2-7)
                         }
                         
                         writer.writerow(row_data)
@@ -3264,7 +3219,8 @@ class StampZApp:
                         print(f"Warning: Could not process measurement {i}: {e}")
                         continue
             
-            print(f"Successfully exported {len(measurements)} measurements to {csv_path}")
+            print(f"Successfully exported {len(sorted_measurements)} measurements to Plot_3D format: {csv_path}")
+            print(f"Format: Row 1=Headers, Rows 2-7=K-means dummy rows, Row 8+=Data")
             return csv_path
             
         except Exception as e:

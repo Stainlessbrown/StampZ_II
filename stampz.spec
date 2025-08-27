@@ -30,6 +30,15 @@ try:
 except Exception:
     pass
 
+# Collect seaborn data files and imports for Plot_3D
+try:
+    seaborn_datas, seaborn_binaries, seaborn_hiddenimports = collect_all('seaborn')
+    datas += seaborn_datas
+    binaries += seaborn_binaries
+    hiddenimports += seaborn_hiddenimports
+except Exception:
+    pass
+
 # Add additional hidden imports
 hiddenimports += [
     'PIL.Image',
@@ -54,6 +63,7 @@ hiddenimports += [
     'matplotlib.pyplot',
     'matplotlib.backends.backend_tkagg',
     'pandas',
+    'seaborn',
     'odf.opendocument',
     'odf.table',
     'odf.text',

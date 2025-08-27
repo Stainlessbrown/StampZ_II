@@ -17,8 +17,14 @@ import pandas as pd
 import platform
 import threading
 import os
-import seaborn as sns
-sns.set_style("whitegrid", {'axes.grid': False})
+# Optional seaborn import for styling
+try:
+    import seaborn as sns
+    sns.set_style("whitegrid", {'axes.grid': False})
+    HAS_SEABORN = True
+except ImportError:
+    print("Warning: seaborn not available. Using default matplotlib styling.")
+    HAS_SEABORN = False
 
 from .logging_setup import setup_logging
 from .template_selector import TemplateSelector
