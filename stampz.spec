@@ -39,6 +39,24 @@ try:
 except Exception:
     pass
 
+# Collect scikit-learn data files and imports for Plot_3D clustering and PCA
+try:
+    sklearn_datas, sklearn_binaries, sklearn_hiddenimports = collect_all('sklearn')
+    datas += sklearn_datas
+    binaries += sklearn_binaries
+    hiddenimports += sklearn_hiddenimports
+except Exception:
+    pass
+
+# Collect ezodf data files and imports for ODS file handling
+try:
+    ezodf_datas, ezodf_binaries, ezodf_hiddenimports = collect_all('ezodf')
+    datas += ezodf_datas
+    binaries += ezodf_binaries
+    hiddenimports += ezodf_hiddenimports
+except Exception:
+    pass
+
 # Add additional hidden imports
 hiddenimports += [
     'PIL.Image',
@@ -64,11 +82,15 @@ hiddenimports += [
     'matplotlib.backends.backend_tkagg',
     'pandas',
     'seaborn',
+    'sklearn',
+    'sklearn.cluster',
+    'sklearn.decomposition',
     'odf.opendocument',
     'odf.table',
     'odf.text',
     'odf.style',
     'odf.number',
+    'ezodf',
     'openpyxl',
     'tifffile',
 ]
