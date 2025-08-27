@@ -1361,6 +1361,141 @@ class ODSExporter:
             print(f"Error viewing averaged measurements: {e}")
             return False
     
+    def export_for_plot3d(self, output_path: str = None) -> str:
+        """Export color analysis data in Plot_3D compatible format.
+        
+        Creates a .ods file with only the 4 columns needed by Plot_3D:
+        - Xnorm (normalized L*)
+        - Ynorm (normalized a*) 
+        - Znorm (normalized b*)
+        - DataID (sample identifier)
+        
+        Data starts at row 8 as required by Plot_3D.
+        
+        Args:
+            output_path: Optional path for output file. If None, generates default path.
+            
+        Returns:
+            Path to exported file, or None if export failed
+        """
+        try:
+            # Get measurements for this sample set
+            measurements = self.get_color_measurements(deduplicate=False)
+            
+            if not measurements:
+                print(f"No measurements found for sample set '{self.sample_set_name}'")
+                return None
+            
+            # Generate output path if not provided
+            if not output_path:
+                if self.prefs_manager:
+                    export_dir = self.prefs_manager.get_export_directory()
+                    os.makedirs(export_dir, exist_ok=True)
+                else:
+                    # Fallback to exports directory
+                    stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+                    if stampz_data_dir:
+                        export_dir = os.path.join(stampz_data_dir, "exports")
+                    else:
+                        current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        export_dir = os.path.join(current_dir, "exports")
+                    os.makedirs(export_dir, exist_ok=True)
+                
+                # Create filename with Plot_3D suffix
+                base_name = self.sample_set_name or "color_data"
+                filename = f"{base_name}_Plot3D.ods"
+                output_path = os.path.join(export_dir, filename)
+            
+            # Create Plot_3D compatible ODS document
+            doc = self._create_plot3d_document(measurements)
+            
+            # Save document
+            doc.save(output_path)
+            
+            print(f"Successfully exported {len(measurements)} measurements for Plot_3D: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            print(f"Error exporting for Plot_3D: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def _create_plot3d_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
+        """Create an ODS document formatted specifically for Plot_3D.
+        
+        Plot_3D expects:
+        - Only 4 columns: Xnorm, Ynorm, Znorm, DataID
+        - Data starts at row 8 (rows 1-7 are reserved for Plot_3D headers)
+        - Normalized values (0.0-1.0 range)
+        """
+        if not ODF_AVAILABLE:
+            raise RuntimeError("odfpy library not available. Cannot create ODS document.")
+        
+        # Create new document
+        doc = OpenDocumentSpreadsheet()
+        
+        # Create table
+        table = Table(name="Plot_3D Data")
+        
+        # Add 7 empty rows (rows 1-7 reserved for Plot_3D)
+        for i in range(7):
+            empty_row = TableRow()
+            # Add empty cells for the 4 columns
+            for j in range(4):
+                cell = TableCell()
+                cell.addElement(P(text=""))
+                empty_row.addElement(cell)
+            table.addElement(empty_row)
+        
+        # Add header row at row 8
+        header_row = TableRow()
+        headers = ["Xnorm", "Ynorm", "Znorm", "DataID"]
+        
+        for header in headers:
+            cell = TableCell()
+            cell.addElement(P(text=header))
+            header_row.addElement(cell)
+        
+        table.addElement(header_row)
+        
+        # Add data rows starting from row 9
+        for measurement in measurements:
+            row = TableRow()
+            
+            # Create the 4 values for Plot_3D
+            values = [
+                self._normalize_lab_l(measurement.l_value),    # Xnorm (L* normalized)
+                self._normalize_lab_ab(measurement.a_value),   # Ynorm (a* normalized)
+                self._normalize_lab_ab(measurement.b_value),   # Znorm (b* normalized)
+                measurement.data_id                            # DataID
+            ]
+            
+            for i, value in enumerate(values):
+                cell = TableCell()
+                
+                # Set proper value type for numeric columns (first 3)
+                if i < 3 and value and value != "":
+                    try:
+                        numeric_value = float(value)
+                        cell.setAttribute('valuetype', 'float')
+                        cell.setAttribute('value', str(numeric_value))
+                        cell.addElement(P(text=value))
+                    except (ValueError, TypeError):
+                        cell.addElement(P(text=str(value)))
+                else:
+                    # DataID column or empty values
+                    cell.addElement(P(text=str(value)))
+                
+                row.addElement(cell)
+            
+            table.addElement(row)
+        
+        # Add table to document
+        doc.spreadsheet.addElement(table)
+        
+        return doc
+    
     def export_and_open_averaged_measurements(self, sample_set_name: str = None) -> bool:
         """Export averaged measurements to separate spreadsheet and open it.
         

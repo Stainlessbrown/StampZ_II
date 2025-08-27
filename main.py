@@ -997,6 +997,18 @@ class StampZApp:
                 dialog.quit()
                 dialog.destroy()
             
+            def on_export_plot3d():
+                nonlocal selected_option, selected_sample_set
+                selection = sets_listbox.curselection()
+                if not selection:
+                    messagebox.showwarning("No Selection", "Please select a sample set to export for Plot_3D")
+                    return
+                
+                selected_option = "plot3d"
+                selected_sample_set = available_sets[selection[0]]
+                dialog.quit()
+                dialog.destroy()
+            
             def on_cancel():
                 nonlocal selected_option
                 selected_option = None
@@ -1007,9 +1019,10 @@ class StampZApp:
             buttons_frame = Frame(dialog)
             buttons_frame.pack(pady=10)
             
-            Button(buttons_frame, text="View Selected Set", command=on_view_selected, width=15).pack(side="left", padx=5)
-            Button(buttons_frame, text="View All Data", command=on_view_all, width=15).pack(side="left", padx=5)
-            Button(buttons_frame, text="Cancel", command=on_cancel, width=10).pack(side="left", padx=5)
+            Button(buttons_frame, text="View Selected Set", command=on_view_selected, width=15).pack(side="left", padx=3)
+            Button(buttons_frame, text="View All Data", command=on_view_all, width=12).pack(side="left", padx=3)
+            Button(buttons_frame, text="Export for Plot_3D", command=on_export_plot3d, width=15).pack(side="left", padx=3)
+            Button(buttons_frame, text="Cancel", command=on_cancel, width=8).pack(side="left", padx=3)
             
             # Keyboard bindings
             dialog.bind('<Return>', lambda e: on_view_selected())
@@ -1054,6 +1067,33 @@ class StampZApp:
                     messagebox.showerror(
                         "View Error",
                         "Failed to open spreadsheet. Please check that LibreOffice Calc is installed."
+                    )
+            elif selected_option == "plot3d" and selected_sample_set:
+                print(f"DEBUG: User selected Plot_3D export for sample set: {selected_sample_set}")
+                from utils.ods_exporter import ODSExporter
+                
+                # Handle averages database
+                base_sample_set = selected_sample_set
+                if selected_sample_set.endswith('_averages'):
+                    base_sample_set = selected_sample_set[:-9]  # Remove '_averages' suffix
+                    print(f"DEBUG: Detected averages database, using base name: {base_sample_set}")
+                
+                exporter = ODSExporter(sample_set_name=base_sample_set)
+                success, output_path = exporter.export_for_plot3d()
+                
+                if success:
+                    messagebox.showinfo(
+                        "Export Complete",
+                        f"Successfully exported Plot_3D data for sample set '{base_sample_set}'.\n\n"
+                        f"File saved to:\n{output_path}\n\n"
+                        f"This file can be loaded in Plot_3D for 3D color space analysis."
+                    )
+                else:
+                    error_msg = output_path if output_path else "Unknown error occurred"
+                    messagebox.showerror(
+                        "Export Error",
+                        f"Failed to export Plot_3D data for sample set '{base_sample_set}'.\n\n"
+                        f"Error: {error_msg}"
                     )
             # If selected_option is None, user cancelled - do nothing
             
