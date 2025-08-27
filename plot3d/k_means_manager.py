@@ -2,7 +2,13 @@ import os
 import logging
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+try:
+    from sklearn.cluster import KMeans
+    HAS_SKLEARN = True
+except ImportError:
+    print("Warning: scikit-learn not available. K-means clustering will be disabled.")
+    HAS_SKLEARN = False
+    KMeans = None
 from typing import Optional, Tuple, Dict, Any, Union, List
 import ezodf
 import tkinter as tk
@@ -145,6 +151,10 @@ class KmeansManager:
     def apply_kmeans(self, start_row: int, end_row: int, n_clusters: int = 3) -> pd.DataFrame:
         """Apply K-means clustering to the specified row range."""
         try:
+            # Check if sklearn is available
+            if not HAS_SKLEARN or KMeans is None:
+                raise ImportError("scikit-learn is required for K-means clustering but is not available. Please install it with: pip install scikit-learn")
+            
             # Validate input parameters
             start_row, end_row = self.validate_row_range(start_row, end_row)
             
