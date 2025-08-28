@@ -1072,19 +1072,22 @@ class StampZApp:
                 print(f"DEBUG: User selected Plot_3D export for sample set: {selected_sample_set}")
                 from utils.ods_exporter import ODSExporter
                 
-                # Handle averages database
-                base_sample_set = selected_sample_set
-                if selected_sample_set.endswith('_averages'):
-                    base_sample_set = selected_sample_set[:-9]  # Remove '_averages' suffix
-                    print(f"DEBUG: Detected averages database, using base name: {base_sample_set}")
+                # Handle averages database - DON'T strip suffix, keep as is for proper selection
+                actual_sample_set = selected_sample_set
+                display_name = selected_sample_set
                 
-                exporter = ODSExporter(sample_set_name=base_sample_set)
+                if selected_sample_set.endswith('_averages'):
+                    display_name = selected_sample_set[:-9]  # Remove '_averages' suffix for display only
+                    print(f"DEBUG: Detected averages database, keeping full name: {actual_sample_set}")
+                    print(f"DEBUG: Display name: {display_name}")
+                
+                exporter = ODSExporter(sample_set_name=actual_sample_set)
                 success, output_path = exporter.export_for_plot3d()
                 
                 if success:
                     messagebox.showinfo(
                         "Export Complete",
-                        f"Successfully exported Plot_3D data for sample set '{base_sample_set}'.\n\n"
+                        f"Successfully exported Plot_3D data for sample set '{display_name}'.\n\n"
                         f"File saved to:\n{output_path}\n\n"
                         f"This file can be loaded in Plot_3D for 3D color space analysis."
                     )
@@ -1092,7 +1095,7 @@ class StampZApp:
                     error_msg = output_path if output_path else "Unknown error occurred"
                     messagebox.showerror(
                         "Export Error",
-                        f"Failed to export Plot_3D data for sample set '{base_sample_set}'.\n\n"
+                        f"Failed to export Plot_3D data for sample set '{display_name}'.\n\n"
                         f"Error: {error_msg}"
                     )
             # If selected_option is None, user cancelled - do nothing
