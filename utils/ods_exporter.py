@@ -1453,7 +1453,8 @@ class ODSExporter:
         # Create table
         table = Table(name="Plot_3D Data")
         
-        # Plot_3D expected columns in correct layout order  
+        # Plot_3D expected columns - includes Radius column which is required
+        # StampZ only populates first 4 columns, Plot_3D manages the rest
         headers = ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 
                    'Color', 'Centroid_X', 'Centroid_Y', 'Centroid_Z', 'Sphere', 'Radius']
         
