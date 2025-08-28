@@ -1081,22 +1081,23 @@ class StampZApp:
                     print(f"DEBUG: Detected averages database, keeping full name: {actual_sample_set}")
                     print(f"DEBUG: Display name: {display_name}")
                 
-                exporter = DirectPlot3DExporter(sample_set_name=actual_sample_set)
-                success, output_path = exporter.export_plot3d_file()
+                exporter = DirectPlot3DExporter()
+                created_files = exporter.export_to_plot3d(actual_sample_set)
                 
-                if success:
+                if created_files:
+                    # Show success message with all created files
+                    files_list = "\n".join([f"  - {os.path.basename(f)}" for f in created_files])
                     messagebox.showinfo(
                         "Export Complete",
                         f"Successfully exported Plot_3D data for sample set '{display_name}'.\n\n"
-                        f"File saved to:\n{output_path}\n\n"
-                        f"This file can be loaded in Plot_3D for 3D color space analysis."
+                        f"Created {len(created_files)} file(s):\n{files_list}\n\n"
+                        f"These files can be loaded in Plot_3D for 3D color space analysis."
                     )
                 else:
-                    error_msg = output_path if output_path else "Unknown error occurred"
                     messagebox.showerror(
                         "Export Error",
                         f"Failed to export Plot_3D data for sample set '{display_name}'.\n\n"
-                        f"Error: {error_msg}"
+                        f"No files were created. Please check the sample set has valid data."
                     )
             # If selected_option is None, user cancelled - do nothing
             
