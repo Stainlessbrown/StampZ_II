@@ -125,8 +125,9 @@ class DirectPlot3DExporter:
             # Convert to Plot_3D format
             plot3d_data = []
             for measurement in measurements:
-                # Skip Point 999 entries (these are usually test/calibration points)
-                if measurement.get('coordinate_point') == 999:
+                # Skip Point 999 entries for individual measurements (these are usually test/calibration points)
+                # But keep Point 999 for averaged measurements as these are legitimate averaged data
+                if measurement.get('coordinate_point') == 999 and not use_averages:
                     continue
                 
                 # Create DataID from available information
