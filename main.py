@@ -1070,7 +1070,7 @@ class StampZApp:
                     )
             elif selected_option == "plot3d" and selected_sample_set:
                 print(f"DEBUG: User selected Plot_3D export for sample set: {selected_sample_set}")
-                from utils.ods_exporter import ODSExporter
+                from utils.direct_plot3d_exporter import DirectPlot3DExporter
                 
                 # Handle averages database - DON'T strip suffix, keep as is for proper selection
                 actual_sample_set = selected_sample_set
@@ -1081,8 +1081,8 @@ class StampZApp:
                     print(f"DEBUG: Detected averages database, keeping full name: {actual_sample_set}")
                     print(f"DEBUG: Display name: {display_name}")
                 
-                exporter = ODSExporter(sample_set_name=actual_sample_set)
-                success, output_path = exporter.export_for_plot3d()
+                exporter = DirectPlot3DExporter(sample_set_name=actual_sample_set)
+                success, output_path = exporter.export_plot3d_file()
                 
                 if success:
                     messagebox.showinfo(
