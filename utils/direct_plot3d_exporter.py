@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+"""
+Direct Plot_3D Exporter
+
+This module directly exports StampZ color analysis data to Plot_3D format by:
+1. Copying the blank Plot3D_Template.ods file
+2. Reading data directly from StampZ databases 
+3. Inserting L*_norm, a*_norm, b*_norm, DataID into columns A-D starting at row 8
+4. Saving with appropriate filename
+
+This bypasses the intermediate StampZ export format and avoids column header issues.
+"""
+
+import os
+import sys
+import shutil
+import logging
+from datetime import datetime
+from typing import List, Dict, Optional, Tuple
+import ezodf
+import time
+
+class DirectPlot3DExporter:
+    """Direct exporter from StampZ databases to Plot_3D format."""
+    
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        """Initialize the direct exporter.
+        
+        Args:
+            logger: Optional logger instance
+        """
+        if logger is None:
+            self.logger = logging.getLogger(__name__)
+            if not self.logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                handler.setFormatter(formatter)
+                self.logger.addHandler(handler)
+                self.logger.setLevel(logging.INFO)
+        else:
+            self.logger = logger
+            
+        # Set up paths
+        self._setup_paths()
+        
+        self.logger.info("DirectPlot3DExporter initialized")
+    
+    def _setup_paths(self):
+        """Set up file paths for templates and data directories."""
+        # Template path
+        script_dir = os.path.dirname(os.path.dirname(__file__))
+        self.template_path = os.path.join(script_dir, 'templates', 'plot3d', 'Plot3D_Template.ods')
+        
+        # Data directories - check environment variable first
+        stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
+        if stampz_data_dir:
+            self.color_data_dir = os.path.join(stampz_data_dir, "data", "color_analysis")
+            self.coordinates_db_path = os.path.join(stampz_data_dir, "coordinates.db")
+        else:
+            # Development paths
+            self.color_data_dir = os.path.join(script_dir, "data", "color_analysis")
+            self.coordinates_db_path = os.path.join(script_dir, "data", "coordinates.db")
+        
+        self.logger.info(f"Template path: {self.template_path}")
+        self.logger.info(f"Color data directory: {self.color_data_dir}")
+    
+    def get_available_sample_sets(self) -> List[str]:
+        """Get list of available sample sets for export.
+        
+        Returns:
+            List of sample set names
+        """
+        try:
+            from utils.color_analysis_db import ColorAnalysisDB
+            
+            # Get all databases
+            all_databases = ColorAnalysisDB.get_all_sample_set_databases(self.color_data_dir)
+            
+            # Extract base names (removing _averages suffix)
+            sample_sets = set()
+            for db_name in all_databases:
+                if db_name.endswith('_averages'):
+                    base_name = db_name[:-9]  # Remove '_averages'
+                    sample_sets.add(base_name)
+                else:
+                    sample_sets.add(db_name)
+            
+            return sorted(sample_sets)
+            
+        except Exception as e:
+            self.logger.error(f"Error getting sample sets: {e}")
+            return []
+    
+    def get_sample_data(self, sample_set_name: str, use_averages: bool = False) -> List[Dict]:
+        """Get color measurement data directly from StampZ database.
+        
+        Args:
+            sample_set_name: Name of the sample set
+            use_averages: If True, use averaged data; if False, use individual measurements
+            
+        Returns:
+            List of data dictionaries with keys: L_norm, a_norm, b_norm, DataID
+        """
+        try:
+            from utils.color_analysis_db import ColorAnalysisDB
+            
+            # Determine database name
+            if use_averages:
+                db_name = f"{sample_set_name}_averages"
+            else:
+                db_name = sample_set_name
+            
+            self.logger.info(f"Reading data from database: {db_name}")
+            
+            # Create ColorAnalysisDB instance - API only takes sample_set_name
+            db = ColorAnalysisDB(sample_set_name=db_name)
+            
+            # Get measurements
+            measurements = db.get_all_measurements()
+            
+            if not measurements:
+                self.logger.warning(f"No measurements found for {db_name}")
+                return []
+            
+            # Convert to Plot_3D format
+            plot3d_data = []
+            for measurement in measurements:
+                # Skip Point 999 entries (these are usually test/calibration points)
+                if measurement.get('coordinate_point') == 999:
+                    continue
+                
+                # Create DataID from available information
+                data_id = measurement.get('image_name', 'Unknown')
+                if measurement.get('coordinate_point'):
+                    data_id += f"_P{measurement['coordinate_point']}"
+                
+                data_row = {
+                    'L_norm': measurement['l_value'] / 100.0,  # Normalize L* from 0-100 to 0-1
+                    'a_norm': (measurement['a_value'] + 128) / 255.0,  # Normalize a* from -128/+127 to 0-1
+                    'b_norm': (measurement['b_value'] + 128) / 255.0,  # Normalize b* from -128/+127 to 0-1
+                    'DataID': data_id
+                }
+                plot3d_data.append(data_row)
+            
+            self.logger.info(f"Retrieved {len(plot3d_data)} data points from {db_name}")
+            return plot3d_data
+            
+        except Exception as e:
+            self.logger.error(f"Error getting sample data for {sample_set_name}: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return []
+    
+    def export_to_plot3d(self, sample_set_name: str, output_dir: str = None, 
+                        export_individual: bool = True, export_averages: bool = True) -> List[str]:
+        """Export sample set data directly to Plot_3D format.
+        
+        Args:
+            sample_set_name: Name of the sample set to export
+            output_dir: Directory to save files (default: ~/Desktop/Color Analysis spreadsheets)
+            export_individual: Whether to export individual measurements
+            export_averages: Whether to export averaged measurements
+            
+        Returns:
+            List of created file paths
+        """
+        created_files = []
+        
+        try:
+            # Check template exists
+            if not os.path.exists(self.template_path):
+                self.logger.error(f"Template file not found: {self.template_path}")
+                return created_files
+            
+            # Set default output directory
+            if output_dir is None:
+                output_dir = os.path.expanduser("~/Desktop/Color Analysis spreadsheets")
+                os.makedirs(output_dir, exist_ok=True)
+            
+            # Export individual measurements
+            if export_individual:
+                individual_data = self.get_sample_data(sample_set_name, use_averages=False)
+                if individual_data:
+                    individual_file = os.path.join(output_dir, f"{sample_set_name}_Plot3D.ods")
+                    if self._create_plot3d_file(individual_file, individual_data):
+                        created_files.append(individual_file)
+                        self.logger.info(f"Created individual Plot_3D file: {individual_file}")
+                else:
+                    self.logger.warning(f"No individual data found for {sample_set_name}")
+            
+            # Export averaged measurements
+            if export_averages:
+                averaged_data = self.get_sample_data(sample_set_name, use_averages=True)
+                if averaged_data:
+                    averaged_file = os.path.join(output_dir, f"{sample_set_name}_Averages_Plot3D.ods")
+                    if self._create_plot3d_file(averaged_file, averaged_data):
+                        created_files.append(averaged_file)
+                        self.logger.info(f"Created averaged Plot_3D file: {averaged_file}")
+                else:
+                    self.logger.warning(f"No averaged data found for {sample_set_name}")
+            
+            return created_files
+            
+        except Exception as e:
+            self.logger.error(f"Error exporting {sample_set_name} to Plot_3D: {e}")
+            return created_files
+    
+    def _create_plot3d_file(self, output_path: str, data: List[Dict]) -> bool:
+        """Create Plot_3D file by copying template and inserting data.
+        
+        Args:
+            output_path: Path for the output file
+            data: List of data dictionaries
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Copy template to output location
+            shutil.copy2(self.template_path, output_path)
+            self.logger.info(f"Copied template to: {output_path}")
+            
+            # Open the copied file and insert data
+            doc = ezodf.opendoc(output_path)
+            sheet = doc.sheets[0]
+            
+            # Insert data starting at row 8 (index 7), columns A-D (indices 0-3)
+            start_row_idx = 7  # Row 8 in 0-based indexing
+            
+            for row_offset, data_row in enumerate(data):
+                sheet_row_idx = start_row_idx + row_offset
+                
+                # Column A (index 0): Xnorm (L*_norm)
+                sheet[sheet_row_idx, 0].set_value(data_row['L_norm'])
+                
+                # Column B (index 1): Ynorm (a*_norm)
+                sheet[sheet_row_idx, 1].set_value(data_row['a_norm'])
+                
+                # Column C (index 2): Znorm (b*_norm)
+                sheet[sheet_row_idx, 2].set_value(data_row['b_norm'])
+                
+                # Column D (index 3): DataID
+                sheet[sheet_row_idx, 3].set_value(data_row['DataID'])
+                
+                # Leave other columns (E-L) as they are in the template
+                # Plot_3D will fill these during analysis (Cluster, ∆E, etc.)
+            
+            # Save the document
+            temp_path = f"{output_path}.temp"
+            doc.saveas(temp_path)
+            os.replace(temp_path, output_path)
+            
+            self.logger.info(f"Successfully inserted {len(data)} rows of data into {output_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error creating Plot_3D file {output_path}: {e}")
+            return False
+    
+    def update_existing_plot3d_file(self, file_path: str, sample_set_name: str, 
+                                  use_averages: bool = False) -> bool:
+        """Update an existing Plot_3D file with new data.
+        
+        Args:
+            file_path: Path to existing Plot_3D file
+            sample_set_name: Name of the sample set
+            use_averages: Whether to use averaged data
+            
+        Returns:
+            True if successful
+        """
+        try:
+            if not os.path.exists(file_path):
+                self.logger.error(f"File does not exist: {file_path}")
+                return False
+            
+            # Get new data
+            data = self.get_sample_data(sample_set_name, use_averages=use_averages)
+            if not data:
+                self.logger.warning(f"No data to update for {sample_set_name}")
+                return False
+            
+            # Create backup
+            backup_path = f"{file_path}.backup_{int(time.time())}"
+            shutil.copy2(file_path, backup_path)
+            self.logger.info(f"Created backup: {backup_path}")
+            
+            # Clear existing data and insert new data
+            doc = ezodf.opendoc(file_path)
+            sheet = doc.sheets[0]
+            
+            # Clear data rows (starting from row 8)
+            start_row_idx = 7
+            for row_idx in range(start_row_idx, sheet.nrows()):
+                for col_idx in range(4):  # Clear columns A-D
+                    sheet[row_idx, col_idx].set_value("")
+            
+            # Insert new data
+            for row_offset, data_row in enumerate(data):
+                sheet_row_idx = start_row_idx + row_offset
+                sheet[sheet_row_idx, 0].set_value(data_row['L_norm'])
+                sheet[sheet_row_idx, 1].set_value(data_row['a_norm'])
+                sheet[sheet_row_idx, 2].set_value(data_row['b_norm'])
+                sheet[sheet_row_idx, 3].set_value(data_row['DataID'])
+            
+            # Save
+            temp_path = f"{file_path}.temp"
+            doc.saveas(temp_path)
+            os.replace(temp_path, file_path)
+            
+            # Clean up backup on success
+            try:
+                os.remove(backup_path)
+            except Exception:
+                pass  # Keep backup if cleanup fails
+            
+            self.logger.info(f"Successfully updated {file_path} with {len(data)} rows")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error updating Plot_3D file {file_path}: {e}")
+            return False
+
+
+def main():
+    """Example usage and testing."""
+    exporter = DirectPlot3DExporter()
+    
+    # Get available sample sets
+    sample_sets = exporter.get_available_sample_sets()
+    print(f"Available sample sets: {sample_sets}")
+    
+    if sample_sets:
+        # Export the first sample set as an example
+        sample_set = sample_sets[0]
+        print(f"\nExporting {sample_set}...")
+        
+        created_files = exporter.export_to_plot3d(sample_set)
+        
+        if created_files:
+            print(f"Successfully created {len(created_files)} file(s):")
+            for file_path in created_files:
+                print(f"  - {file_path}")
+        else:
+            print("No files created")
+    else:
+        print("No sample sets available for export")
+
+
+if __name__ == "__main__":
+    main()
