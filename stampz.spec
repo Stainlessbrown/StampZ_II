@@ -127,6 +127,16 @@ if os.path.exists('resources'):
 if os.path.exists('data'):
     datas += [('data', 'data')]
 
+# Explicitly add templates directory to ensure Plot_3D templates are included
+# This fixes the issue where Plot_3D export would fail in bundled apps due to missing template files
+# The templates directory contains Plot3D_Template.ods which is required for the export functionality
+if os.path.exists('data/templates'):
+    datas += [('data/templates', 'data/templates')]
+
+# Add Plot_3D configuration files (zoom presets, etc.)
+if os.path.exists('plot3d/zoom_presets.json'):
+    datas += [('plot3d/zoom_presets.json', 'plot3d')]
+
 a = Analysis(
     ['main.py'],
     pathex=[],
