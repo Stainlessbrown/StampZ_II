@@ -30,13 +30,12 @@ def main():
     print()
     
     try:
-        # Import required modules
-        from utils.ods_exporter import ODSExporter
-        from utils.plot3d_integration import StampZPlot3DIntegrator
+        # Import the new direct exporter (bypasses problematic ODS exporter)
+        from utils.direct_plot3d_exporter import DirectPlot3DExporter
         from utils.color_analysis_db import ColorAnalysisDB
         
-        # Initialize components
-        integrator = StampZPlot3DIntegrator()
+        # Initialize the direct exporter
+        exporter = DirectPlot3DExporter()
         
         # Find all existing analysis databases
         sample_sets = find_all_sample_sets()
@@ -63,8 +62,8 @@ def main():
             print(f"🔄 Processing: {sample_set}")
             
             try:
-                # Try to export this sample set
-                result = export_sample_set_to_plot3d(sample_set, integrator)
+                # Try to export this sample set using direct exporter
+                result = export_sample_set_to_plot3d_direct(sample_set, exporter)
                 results.append(result)
                 
                 if result['success']:
@@ -164,140 +163,44 @@ def find_all_sample_sets() -> Set[str]:
         return set()
 
 
-def export_sample_set_to_plot3d(sample_set: str, integrator) -> Dict:
-    """Export a single sample set to Plot_3D format.
+def export_sample_set_to_plot3d_direct(sample_set: str, exporter) -> Dict:
+    """Export a single sample set to Plot_3D format using direct exporter.
     
     Args:
         sample_set: Name of the sample set to export
-        integrator: StampZPlot3DIntegrator instance
+        exporter: DirectPlot3DExporter instance
         
     Returns:
         Dict with success status, message, and created files
     """
+    result = {
+        'sample_set': sample_set,
+        'success': False,
+        'message': '',
+        'files_created': []
+    }
+    
     try:
-        from utils.ods_exporter import ODSExporter
+        # Use the direct exporter to create Plot_3D files
+        # This bypasses the problematic ODS intermediate step
+        created_files = exporter.export_to_plot3d(
+            sample_set_name=sample_set,
+            export_individual=True,
+            export_averages=True
+        )
         
-        result = {
-            'sample_set': sample_set,
-            'success': False,
-            'message': '',
-            'files_created': []
-        }
-        
-        # Check if this sample set has data
-        try:
-            # Try to create exporter and check for data
-            exporter = ODSExporter(sample_set_name=sample_set)
-            measurements = exporter.get_color_measurements(deduplicate=False)
-            
-            if not measurements:
-                result['message'] = f"No measurement data found for '{sample_set}'"
-                return result
-                
-        except Exception as e:
-            result['message'] = f"Could not access data for '{sample_set}': {str(e)}"
-            return result
-        
-        files_created = []
-        export_errors = []
-        
-        # Export individual measurements (if available)
-        try:
-            individual_exporter = ODSExporter(sample_set_name=sample_set)
-            individual_measurements = individual_exporter.get_color_measurements(deduplicate=True)
-            
-            if individual_measurements:
-                # Create temporary export
-                temp_export = individual_exporter.export_to_sample_set_file(format_type="ods")
-                
-                if temp_export and os.path.exists(temp_export):
-                    # Convert to Plot_3D format
-                    plot3d_success = integrator.integrate_stampz_data(
-                        stampz_export_path=temp_export,
-                        template_name=sample_set,
-                        create_if_missing=True
-                    )
-                    
-                    if plot3d_success:
-                        # Find the created Plot_3D file
-                        plot3d_file = os.path.join(
-                            os.path.dirname(temp_export),
-                            f"{sample_set}_Plot3D.ods"
-                        )
-                        if os.path.exists(plot3d_file):
-                            files_created.append(plot3d_file)
-                    
-                    # Clean up temp export
-                    try:
-                        os.remove(temp_export)
-                    except Exception:
-                        pass
-                        
-        except Exception as e:
-            export_errors.append(f"Individual data export failed: {str(e)}")
-        
-        # Export averaged measurements (if available)  
-        try:
-            averaged_exporter = ODSExporter(sample_set_name=f"{sample_set}_averages")
-            averaged_measurements = averaged_exporter.get_color_measurements(deduplicate=False)
-            
-            if averaged_measurements:
-                # Create temporary export for averages
-                temp_avg_export = averaged_exporter.export_to_sample_set_file(format_type="ods")
-                
-                if temp_avg_export and os.path.exists(temp_avg_export):
-                    # Convert to Plot_3D format with _Avg suffix
-                    plot3d_avg_success = integrator.integrate_stampz_data(
-                        stampz_export_path=temp_avg_export,
-                        plot3d_file_path=os.path.join(
-                            os.path.dirname(temp_avg_export),
-                            f"{sample_set}_Averages_Plot3D.ods"
-                        ),
-                        template_name=f"{sample_set}_Averages",
-                        create_if_missing=True
-                    )
-                    
-                    if plot3d_avg_success:
-                        avg_plot3d_file = os.path.join(
-                            os.path.dirname(temp_avg_export),
-                            f"{sample_set}_Averages_Plot3D.ods"
-                        )
-                        if os.path.exists(avg_plot3d_file):
-                            files_created.append(avg_plot3d_file)
-                    
-                    # Clean up temp export
-                    try:
-                        os.remove(temp_avg_export)
-                    except Exception:
-                        pass
-                        
-        except Exception as e:
-            # Don't treat missing averages as an error - it's optional
-            if "No sample set databases" not in str(e):
-                export_errors.append(f"Averaged data export failed: {str(e)}")
-        
-        # Determine final result
-        if files_created:
+        if created_files:
             result['success'] = True
-            result['files_created'] = files_created
-            result['message'] = f"Successfully exported {len(files_created)} file(s)"
-            
-            if export_errors:
-                result['message'] += f" (with {len(export_errors)} warnings)"
+            result['files_created'] = created_files
+            result['message'] = f"Successfully exported {len(created_files)} file(s)"
         else:
-            result['message'] = "No data exported"
-            if export_errors:
-                result['message'] += f": {'; '.join(export_errors)}"
-        
+            result['message'] = f"No data found for sample set '{sample_set}'"
+            
         return result
         
     except Exception as e:
-        return {
-            'sample_set': sample_set,
-            'success': False,
-            'message': f"Export failed: {str(e)}",
-            'files_created': []
-        }
+        result['message'] = f"Export failed: {str(e)}"
+        return result
 
 
 def get_file_size_mb(file_path: str) -> str:
