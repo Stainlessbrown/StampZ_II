@@ -151,10 +151,16 @@ class ODSExporter:
                     individual_measurements = [m for m in all_measurements if not m.get('is_averaged', False)]
                     averaged_measurements = [m for m in all_measurements if m.get('is_averaged', False)]
                     
-                    # Filter out Point 999 measurements (these are averaged measurements that shouldn't appear in regular exports)
-                    individual_measurements = [m for m in individual_measurements if m.get('coordinate_point', 0) != 999]
-                    
-                    print(f"DEBUG ODSExporter: Filtered out Point 999 entries, now have {len(individual_measurements)} individual measurements")
+                    # For Plot_3D export, handle both individual and averaged measurements
+                    # If this is an averages database (_averages suffix), include Point 999 measurements
+                    if sample_set_name.endswith('_averages'):
+                        # Keep Point 999 measurements for averages databases
+                        print(f"DEBUG ODSExporter: Averages database detected, keeping Point 999 entries")
+                        print(f"DEBUG ODSExporter: Have {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
+                    else:
+                        # Filter out Point 999 measurements for regular databases
+                        individual_measurements = [m for m in individual_measurements if m.get('coordinate_point', 0) != 999]
+                        print(f"DEBUG ODSExporter: Filtered out Point 999 entries, now have {len(individual_measurements)} individual measurements")
                     
                     print(f"DEBUG ODSExporter: Found {len(individual_measurements)} individual + {len(averaged_measurements)} averaged measurements")
                     
@@ -179,22 +185,28 @@ class ODSExporter:
                                 'b_avg': avg_m['rgb_b']
                             }
                     
-                    # Process individual measurements only
-                    if deduplicate:
-                        # Remove duplicates by keeping only the most recent measurement for each coordinate point
-                        # Sort by measurement_date to ensure we get the latest one
-                        sorted_measurements = sorted(individual_measurements, key=lambda x: x['measurement_date'])
-                        
-                        unique_measurements = {}
-                        for measurement in sorted_measurements:
-                            coord_point = measurement['coordinate_point']
-                            # Always keep the latest measurement (due to sorting, later ones overwrite earlier)
-                            unique_measurements[coord_point] = measurement
-                        
-                        measurements_to_process = unique_measurements.values()
+                    # Process measurements - for _averages databases, use averaged measurements as if they were individual measurements
+                    if sample_set_name.endswith('_averages'):
+                        # For averages databases, treat averaged measurements as individual measurements
+                        print(f"DEBUG ODSExporter: Processing {len(averaged_measurements)} averaged measurements as individual measurements")
+                        measurements_to_process = averaged_measurements
                     else:
-                        # Return all individual measurements for accumulation (no averaged rows)
-                        measurements_to_process = individual_measurements
+                        # Process individual measurements for regular databases
+                        if deduplicate:
+                            # Remove duplicates by keeping only the most recent measurement for each coordinate point
+                            # Sort by measurement_date to ensure we get the latest one
+                            sorted_measurements = sorted(individual_measurements, key=lambda x: x['measurement_date'])
+                            
+                            unique_measurements = {}
+                            for measurement in sorted_measurements:
+                                coord_point = measurement['coordinate_point']
+                                # Always keep the latest measurement (due to sorting, later ones overwrite earlier)
+                                unique_measurements[coord_point] = measurement
+                            
+                            measurements_to_process = unique_measurements.values()
+                        else:
+                            # Return all individual measurements for accumulation (no averaged rows)
+                            measurements_to_process = individual_measurements
                     
                     # Get coordinate template information for this sample set
                     coordinate_info = self._get_coordinate_info(sample_set_name)
@@ -1441,7 +1453,7 @@ class ODSExporter:
         # Create table
         table = Table(name="Plot_3D Data")
         
-        # Plot_3D expected columns in correct layout order
+        # Plot_3D expected columns in correct layout order  
         headers = ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 
                    'Color', 'Centroid_X', 'Centroid_Y', 'Centroid_Z', 'Sphere', 'Radius']
         
@@ -1455,33 +1467,19 @@ class ODSExporter:
         
         table.addElement(header_row)
         
-        # Add data validity tables in rows 2-7 (Plot_3D metadata)
+        # Add empty rows 2-7 reserved for Plot_3D metadata/data validity tables
+        # The data validity tables should appear as dropdown lists in LibreOffice Calc
+        # when the user clicks on the appropriate columns (G, H, L)
         # Data from RTF file: 
-        # Marker Type table: ^, <, >, v, o, s, p, h, x, *, D, +
-        # Color tables H: red, green, blue, lime, blueviolet, purple, darkorange, black, orchid, deeppink
-        # Color table L: red, green, blue, yellow, blueviolet, cyan, magenta, orange, purple, brown, pink, lime, navy, teal
-        
-        marker_options = ['^', '<', '>', 'v', 'o', 's']  # First 6 from RTF
-        color_h_options = ['red', 'green', 'blue', 'lime', 'blueviolet', 'purple']  # First 6 from RTF Color H
-        sphere_l_options = ['red', 'green', 'blue', 'yellow', 'blueviolet', 'cyan']  # First 6 from RTF Color L
+        # Marker Type table (column G): ^, <, >, v, o, s, p, h, x, *, D, +
+        # Color tables H (column H): red, green, blue, lime, blueviolet, purple, darkorange, black, orchid, deeppink
+        # Color table L (column L): red, green, blue, yellow, blueviolet, cyan, magenta, orange, purple, brown, pink, lime, navy, teal
         
         for i in range(6):
             validity_row = TableRow()
-            validity_values = [
-                '',  # Xnorm
-                '',  # Ynorm  
-                '',  # Znorm
-                '',  # DataID
-                '',  # Cluster
-                '',  # ∆E
-                marker_options[i] if i < len(marker_options) else '',  # Marker (column G)
-                color_h_options[i] if i < len(color_h_options) else '',  # Color (column H)
-                '',  # Centroid_X
-                '',  # Centroid_Y
-                '',  # Centroid_Z
-                sphere_l_options[i] if i < len(sphere_l_options) else '',  # Sphere (column L)
-                ''   # Radius
-            ]
+            # All cells in rows 2-7 should be empty - data validity tables are dropdown selections only
+            validity_values = ['', '', '', '', '', '', '', '', '', '', '', '', '']  # 13 empty cells
+            
             for value in validity_values:
                 cell = TableCell()
                 cell.addElement(P(text=value))
