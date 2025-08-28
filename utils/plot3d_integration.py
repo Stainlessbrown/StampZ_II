@@ -462,25 +462,35 @@ class StampZPlot3DIntegrator:
                 self.logger.error("Failed to convert data to Plot_3D format")
                 return False
             
-            # Find or create Plot_3D file
+            # Handle Plot_3D file creation/detection
+            file_needs_creation = False
+            
             if plot3d_file_path is None:
+                # Auto-detect existing Plot_3D file
                 plot3d_file_path = self.find_plot3d_file()
-                
-            if plot3d_file_path is None:
+                if plot3d_file_path is None:
+                    file_needs_creation = True
+            else:
+                # Specific file path provided - check if it exists
+                if not os.path.exists(plot3d_file_path):
+                    file_needs_creation = True
+                    
+            # Create new file if needed
+            if file_needs_creation:
                 if create_if_missing:
-                    # Create new Plot_3D file using template name
-                    if template_name:
-                        # Use provided template name
-                        base_name = template_name
-                    else:
-                        # Extract template name from export filename
-                        base_name = self._extract_template_name_from_export(stampz_export_path)
+                    # Determine file path if not already set
+                    if plot3d_file_path is None:
+                        if template_name:
+                            base_name = template_name
+                        else:
+                            base_name = self._extract_template_name_from_export(stampz_export_path)
+                        
+                        plot3d_file_path = os.path.join(
+                            os.path.dirname(stampz_export_path),
+                            f"{base_name}_Plot3D.ods"
+                        )
                     
-                    plot3d_file_path = os.path.join(
-                        os.path.dirname(stampz_export_path),
-                        f"{base_name}_Plot3D.ods"
-                    )
-                    
+                    # Create the new file using template
                     if not self.create_new_plot3d_file(plot3d_file_path, plot3d_data):
                         return False
                     
