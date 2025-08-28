@@ -39,7 +39,7 @@ class StampZPlot3DIntegrator:
     # Default values for Plot_3D columns not provided by StampZ
     PLOT3D_DEFAULTS = {
         'Cluster': None,
-        '∆E': 1.0,  # Default Delta E value
+        '∆E': None,  # Leave blank - Plot_3D will calculate when ∆E function is initiated
         'Marker': '.',
         'Color': 'blue',
         'Centroid_X': float('nan'),
@@ -331,7 +331,7 @@ class StampZPlot3DIntegrator:
             return False
     
     def create_new_plot3d_file(self, output_path: str, data: pd.DataFrame = None) -> bool:
-        """Create a new Plot_3D format .ods file.
+        """Create a new Plot_3D format .ods file using template.
         
         Args:
             output_path: Path where to create the new file
@@ -341,6 +341,49 @@ class StampZPlot3DIntegrator:
             True if file creation successful
         """
         try:
+            # Find the template file
+            template_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),  # Go up from utils/
+                'templates', 'plot3d', 'Plot3D_Template.ods'
+            )
+            
+            if not os.path.exists(template_path):
+                self.logger.error(f"Template file not found: {template_path}")
+                # Fallback to programmatic creation if template doesn't exist
+                return self._create_plot3d_file_programmatically(output_path, data)
+            
+            # Copy template to output location
+            shutil.copy2(template_path, output_path)
+            self.logger.info(f"Copied template to: {output_path}")
+            
+            # If data is provided, insert it starting at row 8
+            if data is not None and not data.empty:
+                success = self.insert_data_to_plot3d(output_path, data, start_row=self.DATA_START_ROW)
+                if not success:
+                    self.logger.error("Failed to insert data into template")
+                    return False
+                self.logger.info(f"Inserted {len(data)} rows of data starting at row {self.DATA_START_ROW}")
+            
+            self.logger.info(f"Created new Plot_3D file from template: {output_path}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error creating new Plot_3D file from template: {e}")
+            return False
+    
+    def _create_plot3d_file_programmatically(self, output_path: str, data: pd.DataFrame = None) -> bool:
+        """Fallback method to create Plot_3D file programmatically if template is missing.
+        
+        Args:
+            output_path: Path where to create the new file
+            data: Optional initial data to include
+            
+        Returns:
+            True if file creation successful
+        """
+        try:
+            self.logger.warning("Using fallback programmatic creation (template preferred)")
+            
             # Create new ODS document
             doc = ezodf.opendocument.OpenDocumentSpreadsheet()
             
@@ -383,11 +426,11 @@ class StampZPlot3DIntegrator:
             # Save document
             doc.save(output_path)
             
-            self.logger.info(f"Created new Plot_3D file: {output_path}")
+            self.logger.info(f"Created new Plot_3D file programmatically: {output_path}")
             return True
             
         except Exception as e:
-            self.logger.error(f"Error creating new Plot_3D file: {e}")
+            self.logger.error(f"Error creating new Plot_3D file programmatically: {e}")
             return False
     
     def integrate_stampz_data(self, stampz_export_path: str, 
