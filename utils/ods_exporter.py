@@ -1361,7 +1361,7 @@ class ODSExporter:
             print(f"Error viewing averaged measurements: {e}")
             return False
     
-    def export_for_plot3d(self, output_path: str = None) -> str:
+    def export_for_plot3d(self, output_path: str = None) -> tuple:
         """Export color analysis data in Plot_3D compatible format.
         
         Creates a .ods file with only the 4 columns needed by Plot_3D:
@@ -1376,15 +1376,16 @@ class ODSExporter:
             output_path: Optional path for output file. If None, generates default path.
             
         Returns:
-            Path to exported file, or None if export failed
+            Tuple of (success: bool, output_path: str or error_message: str)
         """
         try:
             # Get measurements for this sample set
             measurements = self.get_color_measurements(deduplicate=False)
             
             if not measurements:
-                print(f"No measurements found for sample set '{self.sample_set_name}'")
-                return None
+                error_msg = f"No measurements found for sample set '{self.sample_set_name}'"
+                print(error_msg)
+                return False, error_msg
             
             # Generate output path if not provided
             if not output_path:
@@ -1413,13 +1414,14 @@ class ODSExporter:
             doc.save(output_path)
             
             print(f"Successfully exported {len(measurements)} measurements for Plot_3D: {output_path}")
-            return output_path
+            return True, output_path
             
         except Exception as e:
-            print(f"Error exporting for Plot_3D: {e}")
+            error_msg = f"Error exporting for Plot_3D: {e}"
+            print(error_msg)
             import traceback
             traceback.print_exc()
-            return None
+            return False, error_msg
     
     def _create_plot3d_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
         """Create an ODS document formatted specifically for Plot_3D.
