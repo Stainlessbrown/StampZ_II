@@ -218,6 +218,11 @@ class DirectPlot3DExporter:
         try:
             # Copy template to output location
             shutil.copy2(self.template_path, output_path)
+            
+            # Make the copied file writable (templates are read-only)
+            import stat
+            os.chmod(output_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+            
             self.logger.info(f"Copied template to: {output_path}")
             
             # Open the copied file and insert data
