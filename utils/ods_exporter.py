@@ -1428,7 +1428,8 @@ class ODSExporter:
         
         Plot_3D expects all these columns:
         ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 'Color', 'Sphere', 'Centroid_X', 'Centroid_Y', 'Centroid_Z']
-        - Data starts at row 8 (rows 1-7 are reserved for Plot_3D headers)
+        - Headers in row 1
+        - Data starts at row 8 (rows 2-7 are blank/reserved for Plot_3D metadata)
         - Normalized values (0.0-1.0 range)
         """
         if not ODF_AVAILABLE:
@@ -1444,17 +1445,7 @@ class ODSExporter:
         headers = ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 
                    'Color', 'Sphere', 'Centroid_X', 'Centroid_Y', 'Centroid_Z']
         
-        # Add 7 empty rows (rows 1-7 reserved for Plot_3D)
-        for i in range(7):
-            empty_row = TableRow()
-            # Add empty cells for all columns
-            for j in range(len(headers)):
-                cell = TableCell()
-                cell.addElement(P(text=""))
-                empty_row.addElement(cell)
-            table.addElement(empty_row)
-        
-        # Add header row at row 8
+        # Add header row at row 1
         header_row = TableRow()
         
         for header in headers:
@@ -1464,7 +1455,17 @@ class ODSExporter:
         
         table.addElement(header_row)
         
-        # Add data rows starting from row 9
+        # Add 6 empty rows (rows 2-7 reserved for Plot_3D metadata)
+        for i in range(6):
+            empty_row = TableRow()
+            # Add empty cells for all columns
+            for j in range(len(headers)):
+                cell = TableCell()
+                cell.addElement(P(text=""))
+                empty_row.addElement(cell)
+            table.addElement(empty_row)
+        
+        # Add data rows starting from row 8 (after 6 blank rows + header)
         for measurement in measurements:
             row = TableRow()
             
