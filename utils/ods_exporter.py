@@ -1441,9 +1441,9 @@ class ODSExporter:
         # Create table
         table = Table(name="Plot_3D Data")
         
-        # Plot_3D expected columns in exact order
+        # Plot_3D expected columns in correct layout order
         headers = ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 
-                   'Color', 'Sphere', 'Centroid_X', 'Centroid_Y', 'Centroid_Z']
+                   'Color', 'Centroid_X', 'Centroid_Y', 'Centroid_Z', 'Sphere', 'Radius']
         
         # Add header row at row 1
         header_row = TableRow()
@@ -1455,21 +1455,44 @@ class ODSExporter:
         
         table.addElement(header_row)
         
-        # Add 6 empty rows (rows 2-7 reserved for Plot_3D metadata)
+        # Add data validity tables in rows 2-7 (Plot_3D metadata)
+        # Data from RTF file: 
+        # Marker Type table: ^, <, >, v, o, s, p, h, x, *, D, +
+        # Color tables H: red, green, blue, lime, blueviolet, purple, darkorange, black, orchid, deeppink
+        # Color table L: red, green, blue, yellow, blueviolet, cyan, magenta, orange, purple, brown, pink, lime, navy, teal
+        
+        marker_options = ['^', '<', '>', 'v', 'o', 's']  # First 6 from RTF
+        color_h_options = ['red', 'green', 'blue', 'lime', 'blueviolet', 'purple']  # First 6 from RTF Color H
+        sphere_l_options = ['red', 'green', 'blue', 'yellow', 'blueviolet', 'cyan']  # First 6 from RTF Color L
+        
         for i in range(6):
-            empty_row = TableRow()
-            # Add empty cells for all columns
-            for j in range(len(headers)):
+            validity_row = TableRow()
+            validity_values = [
+                '',  # Xnorm
+                '',  # Ynorm  
+                '',  # Znorm
+                '',  # DataID
+                '',  # Cluster
+                '',  # ∆E
+                marker_options[i] if i < len(marker_options) else '',  # Marker (column G)
+                color_h_options[i] if i < len(color_h_options) else '',  # Color (column H)
+                '',  # Centroid_X
+                '',  # Centroid_Y
+                '',  # Centroid_Z
+                sphere_l_options[i] if i < len(sphere_l_options) else '',  # Sphere (column L)
+                ''   # Radius
+            ]
+            for value in validity_values:
                 cell = TableCell()
-                cell.addElement(P(text=""))
-                empty_row.addElement(cell)
-            table.addElement(empty_row)
+                cell.addElement(P(text=value))
+                validity_row.addElement(cell)
+            table.addElement(validity_row)
         
         # Add data rows starting from row 8 (after 6 blank rows + header)
         for measurement in measurements:
             row = TableRow()
             
-            # Create all the values for Plot_3D in the expected order
+            # Create all the values for Plot_3D in the correct column order
             values = [
                 self._normalize_lab_l(measurement.l_value),    # Xnorm (L* normalized)
                 self._normalize_lab_ab(measurement.a_value),   # Ynorm (a* normalized)
@@ -1479,10 +1502,11 @@ class ODSExporter:
                 "",                                           # ∆E (empty, will be calculated by Plot_3D)
                 ".",                                          # Marker (default dot marker)
                 "black",                                      # Color (default color)
-                "",                                           # Sphere (empty, for user use)
                 "",                                           # Centroid_X (empty, will be filled by K-means)
                 "",                                           # Centroid_Y (empty, will be filled by K-means)
-                ""                                            # Centroid_Z (empty, will be filled by K-means)
+                "",                                           # Centroid_Z (empty, will be filled by K-means)
+                "",                                           # Sphere (empty, for user use)
+                ""                                            # Radius (empty, for user use)
             ]
             
             for i, value in enumerate(values):
