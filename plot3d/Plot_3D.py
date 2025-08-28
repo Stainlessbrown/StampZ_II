@@ -157,7 +157,16 @@ class Plot3DApp:
             # Embedded mode - create child window
             self.root = tk.Toplevel(parent)
             self.root.title("3D Color Space Analysis")
-            self.root.transient(parent)  # Stay on top of parent
+            # NOTE: On macOS, transient() can cause window disappearing issues when moved
+            # Use a more stable approach for window management
+            if platform.system() == 'Darwin':
+                # On macOS, don't use transient - just ensure proper window attributes
+                self.root.attributes('-topmost', False)  # Don't force always on top
+                # Store parent reference for cleanup but don't make transient
+                self._parent_window = parent
+            else:
+                # On other platforms, transient works better
+                self.root.transient(parent)
             # NOTE: Removed grab_set() to allow non-modal operation so StampZ remains interactive
             self.is_embedded = True
             
@@ -1380,6 +1389,10 @@ class Plot3DApp:
     def cleanup_and_exit(self):
         # App cleanup and shutdown handler
         print("Application is closing, performing cleanup...")
+        
+        # Clean up parent window reference if stored (macOS fix)
+        if hasattr(self, '_parent_window'):
+            self._parent_window = None
         
         try:
             if hasattr(self, 'custom_delta_e_calculator'):
