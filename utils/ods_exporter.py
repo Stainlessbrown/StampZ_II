@@ -1426,8 +1426,8 @@ class ODSExporter:
     def _create_plot3d_document(self, measurements: List[ColorMeasurement]) -> OpenDocumentSpreadsheet:
         """Create an ODS document formatted specifically for Plot_3D.
         
-        Plot_3D expects:
-        - Only 4 columns: Xnorm, Ynorm, Znorm, DataID
+        Plot_3D expects all these columns:
+        ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 'Color', 'Sphere', 'Centroid_X', 'Centroid_Y', 'Centroid_Z']
         - Data starts at row 8 (rows 1-7 are reserved for Plot_3D headers)
         - Normalized values (0.0-1.0 range)
         """
@@ -1440,11 +1440,15 @@ class ODSExporter:
         # Create table
         table = Table(name="Plot_3D Data")
         
+        # Plot_3D expected columns in exact order
+        headers = ['Xnorm', 'Ynorm', 'Znorm', 'DataID', 'Cluster', '∆E', 'Marker', 
+                   'Color', 'Sphere', 'Centroid_X', 'Centroid_Y', 'Centroid_Z']
+        
         # Add 7 empty rows (rows 1-7 reserved for Plot_3D)
         for i in range(7):
             empty_row = TableRow()
-            # Add empty cells for the 4 columns
-            for j in range(4):
+            # Add empty cells for all columns
+            for j in range(len(headers)):
                 cell = TableCell()
                 cell.addElement(P(text=""))
                 empty_row.addElement(cell)
@@ -1452,7 +1456,6 @@ class ODSExporter:
         
         # Add header row at row 8
         header_row = TableRow()
-        headers = ["Xnorm", "Ynorm", "Znorm", "DataID"]
         
         for header in headers:
             cell = TableCell()
@@ -1465,28 +1468,36 @@ class ODSExporter:
         for measurement in measurements:
             row = TableRow()
             
-            # Create the 4 values for Plot_3D
+            # Create all the values for Plot_3D in the expected order
             values = [
                 self._normalize_lab_l(measurement.l_value),    # Xnorm (L* normalized)
                 self._normalize_lab_ab(measurement.a_value),   # Ynorm (a* normalized)
                 self._normalize_lab_ab(measurement.b_value),   # Znorm (b* normalized)
-                measurement.data_id                            # DataID
+                measurement.data_id,                           # DataID
+                "",                                           # Cluster (empty, will be filled by K-means)
+                "",                                           # ∆E (empty, will be calculated by Plot_3D)
+                ".",                                          # Marker (default dot marker)
+                "black",                                      # Color (default color)
+                "",                                           # Sphere (empty, for user use)
+                "",                                           # Centroid_X (empty, will be filled by K-means)
+                "",                                           # Centroid_Y (empty, will be filled by K-means)
+                ""                                            # Centroid_Z (empty, will be filled by K-means)
             ]
             
             for i, value in enumerate(values):
                 cell = TableCell()
                 
-                # Set proper value type for numeric columns (first 3)
+                # Set proper value type for numeric columns (first 3 are normalized coordinates)
                 if i < 3 and value and value != "":
                     try:
                         numeric_value = float(value)
                         cell.setAttribute('valuetype', 'float')
                         cell.setAttribute('value', str(numeric_value))
-                        cell.addElement(P(text=value))
+                        cell.addElement(P(text=str(value)))
                     except (ValueError, TypeError):
                         cell.addElement(P(text=str(value)))
                 else:
-                    # DataID column or empty values
+                    # Non-numeric columns or empty values
                     cell.addElement(P(text=str(value)))
                 
                 row.addElement(cell)
