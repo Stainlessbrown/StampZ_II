@@ -164,6 +164,9 @@ class Plot3DApp:
         # Common window configuration
         self.root.resizable(True, True)
         
+        # Calculate appropriate window size based on screen dimensions
+        self._configure_window_geometry()
+        
         # Configure main window grid
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
@@ -211,8 +214,7 @@ class Plot3DApp:
         print("Initializing UI components...")
         self._init_ui()
         
-        # Set window size after UI creation
-        self.root.geometry("1200x800")
+        # Window size already set in _configure_window_geometry()
         
         # Create initial plot
         self.refresh_plot()
@@ -1334,6 +1336,47 @@ class Plot3DApp:
         # Configure control frame grid
         self.control_frame.grid_columnconfigure(0, weight=1)
                     
+    def _configure_window_geometry(self):
+        """Calculate and set optimal window size and position based on screen dimensions."""
+        try:
+            # Get available screen dimensions
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            
+            # Default to larger size for multi-monitor setups (1600x1000)
+            # but scale down for smaller screens
+            if screen_width >= 3000:  # Likely multi-monitor setup
+                window_width = 1600
+                window_height = 1000
+            elif screen_width >= 1920:  # Standard desktop/larger laptop
+                window_width = 1400
+                window_height = 900
+            else:  # Smaller screens
+                window_width = min(1200, int(screen_width * 0.8))
+                window_height = min(800, int(screen_height * 0.8))
+            
+            # Try to detect multiple monitors and position on second monitor if available
+            # This is approximate since Tkinter doesn't have direct multi-monitor API
+            if screen_width > 2000:  # Likely multiple monitors
+                # Position on second monitor - assume first monitor ends around screen_width/2
+                # This is a simplification but works for common side-by-side monitor setups
+                x_position = max(screen_width // 2, screen_width - window_width - 50)
+                y_position = (screen_height - window_height) // 2
+            else:
+                # Center on primary monitor
+                x_position = (screen_width - window_width) // 2
+                y_position = (screen_height - window_height) // 2
+            
+            # Set the geometry
+            self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+            
+            # Set minimum size to ensure controls remain usable
+            self.root.minsize(900, 700)
+        except Exception as e:
+            # Fall back to default size if anything goes wrong
+            print(f"Warning: Could not calculate optimal window size: {e}")
+            self.root.geometry("1200x800")
+    
     def cleanup_and_exit(self):
         # App cleanup and shutdown handler
         print("Application is closing, performing cleanup...")
