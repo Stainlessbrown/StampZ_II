@@ -109,12 +109,12 @@ hiddenimports += [
 
 # Platform specific settings
 if sys.platform == 'darwin':
-    # macOS
-    icon_path = 'StampZ_II.icns' if os.path.exists('StampZ_II.icns') else None
+    # macOS - use original StampZ icon (convert on-the-fly if needed)
+    icon_path = 'resources/StampZ.ico' if os.path.exists('resources/StampZ.ico') else None
     onefile = False  # Use --onedir for app bundles
 elif sys.platform == 'win32':
-    # Windows
-    icon_path = 'resources/StampZ_II_icon.ico' if os.path.exists('resources/StampZ_II_icon.ico') else None
+    # Windows - use original StampZ icon
+    icon_path = 'resources/StampZ.ico' if os.path.exists('resources/StampZ.ico') else None
     onefile = True
 else:
     # Linux

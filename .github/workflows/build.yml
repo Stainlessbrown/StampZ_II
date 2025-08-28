@@ -45,19 +45,19 @@ jobs:
     - name: Create macOS icon (icns)
       if: startsWith(matrix.os, 'macos')
       run: |
-        # Create icns file from PNG for macOS
+        # Create icns file from original StampZ PNG for macOS
         mkdir -p StampZ.iconset
-        # Use sips (built into macOS) to create different sizes from StampZ_II icon
-        sips -z 16 16 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_16x16.png"
-        sips -z 32 32 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_16x16@2x.png"
-        sips -z 32 32 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_32x32.png"
-        sips -z 64 64 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_32x32@2x.png"
-        sips -z 128 128 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_128x128.png"
-        sips -z 256 256 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_128x128@2x.png"
-        sips -z 256 256 "resources/StampZ_II_icon_256.png" --out "StampZ.iconset/icon_256x256.png"
-        sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_256x256@2x.png"
-        sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512.png"
-        sips -z 1024 1024 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512@2x.png" 2>/dev/null || sips -z 512 512 "resources/StampZ_II_icon_512.png" --out "StampZ.iconset/icon_512x512@2x.png"
+        # Use sips (built into macOS) to create different sizes from original StampZ_256 icon
+        sips -z 16 16 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16.png"
+        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_16x16@2x.png"
+        sips -z 32 32 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32.png"
+        sips -z 64 64 "resources/StampZ_256.png" --out "StampZ.iconset/icon_32x32@2x.png"
+        sips -z 128 128 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128.png"
+        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_128x128@2x.png"
+        sips -z 256 256 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256.png"
+        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_256x256@2x.png"
+        sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512.png"
+        sips -z 1024 1024 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png" 2>/dev/null || sips -z 512 512 "resources/StampZ_256.png" --out "StampZ.iconset/icon_512x512@2x.png"
         # Create the icns file
         iconutil -c icns StampZ.iconset
         ls -la StampZ.icns
