@@ -92,16 +92,10 @@ jobs:
     - name: Build macOS executable
       if: startsWith(matrix.os, 'macos')
       run: |
-        # macOS: Create .app bundle with icon
-        python -m PyInstaller --onedir --windowed --name StampZ_II_${{ matrix.name }} \
-          --icon=StampZ.icns \
-          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text \
-          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious \
-          --hidden-import=matplotlib --hidden-import=matplotlib.pyplot --hidden-import=pandas \
-          --hidden-import=matplotlib.backends.backend_tkagg --hidden-import=openpyxl \
-          --hidden-import=tifffile \
-          --collect-all odfpy --collect-all matplotlib --collect-all openpyxl --add-data "resources:resources" --add-data "data:data" \
-          --runtime-hook runtime_hook.py main.py
+        # macOS: Use stampz.spec for consistent builds with template files included
+        python -m PyInstaller stampz.spec
+        # Rename the output to match expected name
+        mv dist/StampZ_II.app dist/StampZ_II_${{ matrix.name }}.app
         echo "macOS build completed. Checking dist directory:"
         ls -la dist/
         
@@ -109,15 +103,17 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        # Windows: Create full-featured single executable with all components
-        python -m PyInstaller --onefile --windowed --name "StampZ_II_${{ matrix.name }}" `
-          --hidden-import=odf.opendocument --hidden-import=odf.table --hidden-import=odf.text `
-          --hidden-import=odf.style --hidden-import=odf.number --hidden-import=colorspacious `
-          --hidden-import=matplotlib --hidden-import=matplotlib.pyplot --hidden-import=pandas `
-          --hidden-import=matplotlib.backends.backend_tkagg --hidden-import=openpyxl `
-          --hidden-import=tifffile `
-          --collect-all odfpy --collect-all matplotlib --collect-all openpyxl --add-data "resources;resources" --add-data "data;data" `
-          --runtime-hook runtime_hook.py main.py
+        # Windows: Use stampz.spec for consistent builds with template files included
+        # Note: spec file will create onefile build on Windows platform
+        python -m PyInstaller stampz.spec
+        # Rename the output to match expected name (Windows creates .exe automatically)
+        if (Test-Path "dist/StampZ_II.exe") {
+          Rename-Item "dist/StampZ_II.exe" "StampZ_II_${{ matrix.name }}.exe"
+        } else {
+          Write-Host "ERROR: StampZ_II.exe not found! Checking dist directory:"
+          Get-ChildItem dist
+          exit 1
+        }
         Write-Host "Windows build completed. Checking dist directory:"
         Get-ChildItem dist
         
