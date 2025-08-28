@@ -156,7 +156,7 @@ class DirectPlot3DExporter:
         """Export sample set data directly to Plot_3D format.
         
         Args:
-            sample_set_name: Name of the sample set to export
+            sample_set_name: Name of the sample set to export (can be base name or with _averages suffix)
             output_dir: Directory to save files (default: ~/Desktop/Color Analysis spreadsheets)
             export_individual: Whether to export individual measurements
             export_averages: Whether to export averaged measurements
@@ -177,27 +177,38 @@ class DirectPlot3DExporter:
                 output_dir = os.path.expanduser("~/Desktop/Color Analysis spreadsheets")
                 os.makedirs(output_dir, exist_ok=True)
             
-            # Export individual measurements
+            # Determine base name and whether this is specifically an averages database
+            if sample_set_name.endswith('_averages'):
+                base_name = sample_set_name[:-9]  # Remove '_averages' suffix
+                # If user selected an _averages database specifically, only export averages
+                self.logger.info(f"Sample set '{sample_set_name}' appears to be averages-only database")
+                export_individual = False  # Don't try to export individual data from averages database
+                actual_sample_set = base_name  # Use base name for the export logic
+            else:
+                base_name = sample_set_name
+                actual_sample_set = sample_set_name
+            
+            # Export individual measurements (only if not an averages-only database)
             if export_individual:
-                individual_data = self.get_sample_data(sample_set_name, use_averages=False)
+                individual_data = self.get_sample_data(actual_sample_set, use_averages=False)
                 if individual_data:
-                    individual_file = os.path.join(output_dir, f"{sample_set_name}_Plot3D.ods")
+                    individual_file = os.path.join(output_dir, f"{base_name}_Plot3D.ods")
                     if self._create_plot3d_file(individual_file, individual_data):
                         created_files.append(individual_file)
                         self.logger.info(f"Created individual Plot_3D file: {individual_file}")
                 else:
-                    self.logger.warning(f"No individual data found for {sample_set_name}")
+                    self.logger.warning(f"No individual data found for {actual_sample_set}")
             
             # Export averaged measurements
             if export_averages:
-                averaged_data = self.get_sample_data(sample_set_name, use_averages=True)
+                averaged_data = self.get_sample_data(actual_sample_set, use_averages=True)
                 if averaged_data:
-                    averaged_file = os.path.join(output_dir, f"{sample_set_name}_Averages_Plot3D.ods")
+                    averaged_file = os.path.join(output_dir, f"{base_name}_Averages_Plot3D.ods")
                     if self._create_plot3d_file(averaged_file, averaged_data):
                         created_files.append(averaged_file)
                         self.logger.info(f"Created averaged Plot_3D file: {averaged_file}")
                 else:
-                    self.logger.warning(f"No averaged data found for {sample_set_name}")
+                    self.logger.warning(f"No averaged data found for {actual_sample_set}")
             
             return created_files
             
