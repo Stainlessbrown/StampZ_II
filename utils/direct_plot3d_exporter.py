@@ -47,19 +47,20 @@ class DirectPlot3DExporter:
     
     def _setup_paths(self):
         """Set up file paths for templates and data directories."""
-        # Template path
-        script_dir = os.path.dirname(os.path.dirname(__file__))
-        self.template_path = os.path.join(script_dir, 'templates', 'plot3d', 'Plot3D_Template.ods')
-        
         # Data directories - check environment variable first
         stampz_data_dir = os.getenv('STAMPZ_DATA_DIR')
         if stampz_data_dir:
             self.color_data_dir = os.path.join(stampz_data_dir, "data", "color_analysis")
             self.coordinates_db_path = os.path.join(stampz_data_dir, "coordinates.db")
+            # Template path is now in data directory
+            self.template_path = os.path.join(stampz_data_dir, "data", "templates", "plot3d", "Plot3D_Template.ods")
         else:
             # Development paths
+            script_dir = os.path.dirname(os.path.dirname(__file__))
             self.color_data_dir = os.path.join(script_dir, "data", "color_analysis")
             self.coordinates_db_path = os.path.join(script_dir, "data", "coordinates.db")
+            # Template path is now in data directory
+            self.template_path = os.path.join(script_dir, "data", "templates", "plot3d", "Plot3D_Template.ods")
         
         self.logger.info(f"Template path: {self.template_path}")
         self.logger.info(f"Color data directory: {self.color_data_dir}")

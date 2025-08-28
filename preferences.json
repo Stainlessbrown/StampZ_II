@@ -1,21 +1,22 @@
 {
   "export_prefs": {
-    "ods_export_directory": null,
-    "auto_open_after_export": true,
+    "ods_export_directory": "/Users/stanbrown/Desktop/StampZ Exports",
+    "auto_open_after_export": false,
     "export_filename_format": "{sample_set}_{date}",
     "include_timestamp": false,
     "preferred_export_format": "ods",
-    "export_normalized_values": false,
+    "export_normalized_values": true,
     "export_include_rgb": false,
     "export_include_lab": true
   },
   "file_dialog_prefs": {
-    "last_open_directory": "/Users/stanbrown/Desktop/Semeuse comparisons scans",
-    "last_save_directory": "/Users/stanbrown/Desktop/F137-S41R-crp.tif",
+    "last_open_directory": "/Users/stanbrown/Desktop/2025 Color Analysis/138 - 10c red",
+    "last_save_directory": "/Users/stanbrown/Desktop/2025 color -cropped/138/138-S18-crp.tif",
     "remember_directories": true
   },
   "color_library_prefs": {
-    "default_library": "basic_colors"
+    "default_library": "basic_colors",
+    "hide_non_selected_standards": false
   },
   "interface_prefs": {
     "interface_mode": "basic"

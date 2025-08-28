@@ -34,6 +34,11 @@ def create_app_support_dir():
         if not os.path.exists(color_libraries_dir):
             os.makedirs(color_libraries_dir)
         
+        # Create templates directory
+        templates_dir = os.path.join(data_dir, 'templates')
+        if not os.path.exists(templates_dir):
+            os.makedirs(templates_dir)
+        
         # Copy initial data files if they don't exist
         try:
             # Check if running from PyInstaller bundle
@@ -50,6 +55,22 @@ def create_app_support_dir():
                             dst = os.path.join(color_libraries_dir, filename)
                             if not os.path.exists(dst) and os.path.isfile(src):
                                 shutil.copy2(src, dst)
+                    
+                    # Copy templates directory recursively if it doesn't exist
+                    bundle_templates_dir = os.path.join(bundle_data_dir, 'templates')
+                    if os.path.exists(bundle_templates_dir) and not os.listdir(templates_dir):
+                        # Copy entire templates directory structure
+                        def copy_tree(src_dir, dst_dir):
+                            for item in os.listdir(src_dir):
+                                src_path = os.path.join(src_dir, item)
+                                dst_path = os.path.join(dst_dir, item)
+                                if os.path.isdir(src_path):
+                                    os.makedirs(dst_path, exist_ok=True)
+                                    copy_tree(src_path, dst_path)
+                                else:
+                                    shutil.copy2(src_path, dst_path)
+                        copy_tree(bundle_templates_dir, templates_dir)
+                        print(f"DEBUG: Copied templates from bundle to {templates_dir}")
         except Exception as e:
             print(f"Warning: Could not copy initial data files: {e}")
         

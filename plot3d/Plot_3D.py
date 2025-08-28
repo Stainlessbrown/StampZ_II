@@ -549,7 +549,12 @@ class Plot3DApp:
                         
                         # Find principal direction of data variance for line direction
                         # For a more representative line through the data
-                        from sklearn.decomposition import PCA
+                        try:
+                            from sklearn.decomposition import PCA
+                            HAS_SKLEARN = True
+                        except ImportError:
+                            print("Warning: scikit-learn not available. Using fallback method for trendline direction.")
+                            HAS_SKLEARN = False
                         
                         try:
                             # Try PCA approach first for better directional visualization
@@ -658,7 +663,11 @@ class Plot3DApp:
                                     
                                     try:
                                         # Use PCA for better directional visualization
-                                        from sklearn.decomposition import PCA
+                                        try:
+                                            from sklearn.decomposition import PCA
+                                        except ImportError:
+                                            print(f"Warning: scikit-learn not available for {color} trendline PCA. Using fallback.")
+                                            raise Exception("sklearn not available")
                                         
                                         xy_data = np.vstack([x_values, y_values]).T
                                         pca = PCA(n_components=1)
