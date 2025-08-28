@@ -126,6 +126,8 @@ if os.path.exists('resources'):
     datas += [('resources', 'resources')]
 if os.path.exists('data'):
     datas += [('data', 'data')]
+if os.path.exists('templates'):
+    datas += [('templates', 'templates')]
 
 a = Analysis(
     ['main.py'],
