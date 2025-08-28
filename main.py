@@ -1072,13 +1072,12 @@ class StampZApp:
                 print(f"DEBUG: User selected Plot_3D export for sample set: {selected_sample_set}")
                 from utils.direct_plot3d_exporter import DirectPlot3DExporter
                 
-                # Handle averages database - DON'T strip suffix, keep as is for proper selection
+                # Handle averages database - use full name for clarity
                 actual_sample_set = selected_sample_set
-                display_name = selected_sample_set
+                display_name = selected_sample_set  # Use full name including _averages for clarity
                 
                 if selected_sample_set.endswith('_averages'):
-                    display_name = selected_sample_set[:-9]  # Remove '_averages' suffix for display only
-                    print(f"DEBUG: Detected averages database, keeping full name: {actual_sample_set}")
+                    print(f"DEBUG: Detected averages database: {actual_sample_set}")
                     print(f"DEBUG: Display name: {display_name}")
                 
                 exporter = DirectPlot3DExporter()

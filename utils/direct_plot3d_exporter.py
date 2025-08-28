@@ -175,7 +175,7 @@ class DirectPlot3DExporter:
             
             # Set default output directory
             if output_dir is None:
-                output_dir = os.path.expanduser("~/Desktop/Color Analysis spreadsheets")
+                output_dir = os.path.expanduser("~/Desktop/StampZ Exports")
                 os.makedirs(output_dir, exist_ok=True)
             
             # Determine base name and whether this is specifically an averages database
