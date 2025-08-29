@@ -39,8 +39,11 @@ class ZoomControls(tk.LabelFrame):
         self.current_zlim = None
         self.saved_states = {}
         
-        # Path for storing zoom presets
-        self.presets_file = os.path.join(os.path.dirname(__file__), 'zoom_presets.json')
+        # Path for storing zoom presets - use user's home directory
+        user_home = os.path.expanduser('~')
+        presets_dir = os.path.join(user_home, '.stampz', 'presets')
+        os.makedirs(presets_dir, exist_ok=True)
+        self.presets_file = os.path.join(presets_dir, 'zoom_presets.json')
         
         # Variables for storing center point (rounded to 2 decimal places)
         self.center_x = tk.DoubleVar(value=0.50)
