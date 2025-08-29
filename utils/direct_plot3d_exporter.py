@@ -133,8 +133,11 @@ class DirectPlot3DExporter:
                 
                 # Create DataID from available information
                 data_id = measurement.get('image_name', 'Unknown')
-                if measurement.get('coordinate_point'):
+                
+                # For individual measurements, add point number; for averages, keep it simple
+                if measurement.get('coordinate_point') and not use_averages:
                     data_id += f"_P{measurement['coordinate_point']}"
+                # For averaged data, don't add _P999 - just use the image name for cleaner DataID
                 
                 data_row = {
                     'L_norm': measurement['l_value'] / 100.0,  # Normalize L* from 0-100 to 0-1
@@ -195,9 +198,22 @@ class DirectPlot3DExporter:
                 individual_data = self.get_sample_data(actual_sample_set, use_averages=False)
                 if individual_data:
                     individual_file = os.path.join(output_dir, f"{base_name}_Plot3D.ods")
-                    if self._create_plot3d_file(individual_file, individual_data):
-                        created_files.append(individual_file)
-                        self.logger.info(f"Created individual Plot_3D file: {individual_file}")
+                    
+                    # Check if file already exists - if so, append data instead of creating new file
+                    if os.path.exists(individual_file):
+                        self.logger.info(f"File exists, appending data to: {individual_file}")
+                        if self.append_data_to_plot3d_file(individual_file, actual_sample_set, use_averages=False):
+                            created_files.append(individual_file)  # Still add to list for user feedback
+                            self.logger.info(f"Successfully appended individual data to: {individual_file}")
+                        else:
+                            self.logger.warning(f"Failed to append individual data to: {individual_file}")
+                    else:
+                        # File doesn't exist, create new file
+                        if self._create_plot3d_file(individual_file, individual_data):
+                            created_files.append(individual_file)
+                            self.logger.info(f"Created new individual Plot_3D file: {individual_file}")
+                        else:
+                            self.logger.warning(f"Failed to create individual Plot_3D file: {individual_file}")
                 else:
                     self.logger.warning(f"No individual data found for {actual_sample_set}")
             
@@ -206,9 +222,22 @@ class DirectPlot3DExporter:
                 averaged_data = self.get_sample_data(actual_sample_set, use_averages=True)
                 if averaged_data:
                     averaged_file = os.path.join(output_dir, f"{base_name}_Averages_Plot3D.ods")
-                    if self._create_plot3d_file(averaged_file, averaged_data):
-                        created_files.append(averaged_file)
-                        self.logger.info(f"Created averaged Plot_3D file: {averaged_file}")
+                    
+                    # Check if file already exists - if so, append data instead of creating new file
+                    if os.path.exists(averaged_file):
+                        self.logger.info(f"File exists, appending data to: {averaged_file}")
+                        if self.append_data_to_plot3d_file(averaged_file, actual_sample_set, use_averages=True):
+                            created_files.append(averaged_file)  # Still add to list for user feedback
+                            self.logger.info(f"Successfully appended averaged data to: {averaged_file}")
+                        else:
+                            self.logger.warning(f"Failed to append averaged data to: {averaged_file}")
+                    else:
+                        # File doesn't exist, create new file
+                        if self._create_plot3d_file(averaged_file, averaged_data):
+                            created_files.append(averaged_file)
+                            self.logger.info(f"Created new averaged Plot_3D file: {averaged_file}")
+                        else:
+                            self.logger.warning(f"Failed to create averaged Plot_3D file: {averaged_file}")
                 else:
                     self.logger.warning(f"No averaged data found for {actual_sample_set}")
             
@@ -275,9 +304,46 @@ class DirectPlot3DExporter:
             self.logger.error(f"Error creating Plot_3D file {output_path}: {e}")
             return False
     
-    def update_existing_plot3d_file(self, file_path: str, sample_set_name: str, 
-                                  use_averages: bool = False) -> bool:
-        """Update an existing Plot_3D file with new data.
+    def _find_next_empty_row(self, sheet, start_row_idx: int = 7) -> int:
+        """Find the next empty row in the sheet where we can append new data.
+        
+        Args:
+            sheet: ezodf sheet object
+            start_row_idx: Starting row index to search from (default: 7 for row 8)
+            
+        Returns:
+            Row index of the next empty row
+        """
+        try:
+            max_rows = sheet.nrows()
+            
+            # Search for the first row where columns A-D are all empty
+            for row_idx in range(start_row_idx, max_rows):
+                # Check if row is empty in the first 4 columns (A-D)
+                empty_row = True
+                for col_idx in range(4):
+                    cell_value = sheet[row_idx, col_idx].value
+                    if cell_value is not None and str(cell_value).strip():
+                        empty_row = False
+                        break
+                
+                if empty_row:
+                    self.logger.debug(f"Found empty row at index {row_idx} (row {row_idx + 1})")
+                    return row_idx
+            
+            # If no empty row found within existing sheet, return the next row after the last one
+            next_row = max_rows
+            self.logger.debug(f"No empty row found, will append at row index {next_row} (row {next_row + 1})")
+            return next_row
+            
+        except Exception as e:
+            self.logger.error(f"Error finding next empty row: {e}")
+            # Fallback to start_row_idx if there's an error
+            return start_row_idx
+    
+    def append_data_to_plot3d_file(self, file_path: str, sample_set_name: str, 
+                                 use_averages: bool = False) -> bool:
+        """Append new data to an existing Plot_3D file without overwriting existing data.
         
         Args:
             file_path: Path to existing Plot_3D file
@@ -295,6 +361,80 @@ class DirectPlot3DExporter:
             # Get new data
             data = self.get_sample_data(sample_set_name, use_averages=use_averages)
             if not data:
+                self.logger.warning(f"No data to append for {sample_set_name}")
+                return False
+            
+            # Create backup
+            backup_path = f"{file_path}.backup_{int(time.time())}"
+            shutil.copy2(file_path, backup_path)
+            self.logger.info(f"Created backup: {backup_path}")
+            
+            # Open file and find where to append new data
+            doc = ezodf.opendoc(file_path)
+            sheet = doc.sheets[0]
+            
+            # Find the next empty row to start appending
+            start_append_row = self._find_next_empty_row(sheet, start_row_idx=7)
+            
+            self.logger.info(f"Appending {len(data)} rows starting at row {start_append_row + 1}")
+            
+            # Append new data without disturbing existing data
+            for row_offset, data_row in enumerate(data):
+                sheet_row_idx = start_append_row + row_offset
+                
+                # Only set the first 4 columns (A-D), preserving any existing data in columns E-M
+                sheet[sheet_row_idx, 0].set_value(data_row['L_norm'])
+                sheet[sheet_row_idx, 1].set_value(data_row['a_norm'])
+                sheet[sheet_row_idx, 2].set_value(data_row['b_norm'])
+                sheet[sheet_row_idx, 3].set_value(data_row['DataID'])
+                
+                # Do NOT touch columns 4-12 (E-M) - these may contain user data
+                # Plot_3D fills these during analysis (Cluster, ∆E, etc.)
+            
+            # Save
+            temp_path = f"{file_path}.temp"
+            doc.saveas(temp_path)
+            os.replace(temp_path, file_path)
+            
+            # Clean up backup on success
+            try:
+                os.remove(backup_path)
+            except Exception:
+                pass  # Keep backup if cleanup fails
+            
+            self.logger.info(f"Successfully appended {len(data)} rows to {file_path} starting at row {start_append_row + 1}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error appending data to Plot_3D file {file_path}: {e}")
+            return False
+    
+    def update_existing_plot3d_file(self, file_path: str, sample_set_name: str, 
+                                  use_averages: bool = False, append_mode: bool = True) -> bool:
+        """Update an existing Plot_3D file with new data.
+        
+        Args:
+            file_path: Path to existing Plot_3D file
+            sample_set_name: Name of the sample set
+            use_averages: Whether to use averaged data
+            append_mode: If True, append to existing data; if False, replace existing data
+            
+        Returns:
+            True if successful
+        """
+        if append_mode:
+            # Use the new append method by default to preserve existing data
+            return self.append_data_to_plot3d_file(file_path, sample_set_name, use_averages)
+        
+        # Legacy replace mode (for backward compatibility)
+        try:
+            if not os.path.exists(file_path):
+                self.logger.error(f"File does not exist: {file_path}")
+                return False
+            
+            # Get new data
+            data = self.get_sample_data(sample_set_name, use_averages=use_averages)
+            if not data:
                 self.logger.warning(f"No data to update for {sample_set_name}")
                 return False
             
@@ -303,14 +443,16 @@ class DirectPlot3DExporter:
             shutil.copy2(file_path, backup_path)
             self.logger.info(f"Created backup: {backup_path}")
             
-            # Clear existing data and insert new data
+            # Clear existing data and insert new data (LEGACY MODE - USE WITH CAUTION)
             doc = ezodf.opendoc(file_path)
             sheet = doc.sheets[0]
             
-            # Clear data rows (starting from row 8)
+            self.logger.warning("LEGACY REPLACE MODE: This will overwrite existing data!")
+            
+            # Clear data rows (starting from row 8) - ONLY columns A-D
             start_row_idx = 7
             for row_idx in range(start_row_idx, sheet.nrows()):
-                for col_idx in range(4):  # Clear columns A-D
+                for col_idx in range(4):  # Clear columns A-D only, preserve E-M
                     sheet[row_idx, col_idx].set_value("")
             
             # Insert new data
@@ -332,7 +474,7 @@ class DirectPlot3DExporter:
             except Exception:
                 pass  # Keep backup if cleanup fails
             
-            self.logger.info(f"Successfully updated {file_path} with {len(data)} rows")
+            self.logger.info(f"Successfully replaced data in {file_path} with {len(data)} rows")
             return True
             
         except Exception as e:
