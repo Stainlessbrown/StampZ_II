@@ -341,9 +341,36 @@ class DirectPlot3DExporter:
             # Fallback to start_row_idx if there's an error
             return start_row_idx
     
+    def _get_existing_dataids_from_file(self, file_path: str) -> set:
+        """Get set of DataIDs that already exist in the Plot_3D file.
+        
+        Args:
+            file_path: Path to existing Plot_3D file
+            
+        Returns:
+            Set of DataID strings already present in the file
+        """
+        existing_dataids = set()
+        try:
+            doc = ezodf.opendoc(file_path)
+            sheet = doc.sheets[0]
+            
+            # Check DataID column (column D, index 3) starting from row 8
+            for row_idx in range(7, sheet.nrows()):
+                dataid_cell = sheet[row_idx, 3].value  # Column D
+                if dataid_cell and str(dataid_cell).strip():
+                    existing_dataids.add(str(dataid_cell).strip())
+            
+            self.logger.debug(f"Found {len(existing_dataids)} existing DataIDs in {file_path}")
+            return existing_dataids
+            
+        except Exception as e:
+            self.logger.error(f"Error reading existing DataIDs from {file_path}: {e}")
+            return set()
+    
     def append_data_to_plot3d_file(self, file_path: str, sample_set_name: str, 
                                  use_averages: bool = False) -> bool:
-        """Append new data to an existing Plot_3D file without overwriting existing data.
+        """Append only NEW data to an existing Plot_3D file without overwriting existing data.
         
         Args:
             file_path: Path to existing Plot_3D file
@@ -358,11 +385,26 @@ class DirectPlot3DExporter:
                 self.logger.error(f"File does not exist: {file_path}")
                 return False
             
-            # Get new data
-            data = self.get_sample_data(sample_set_name, use_averages=use_averages)
-            if not data:
-                self.logger.warning(f"No data to append for {sample_set_name}")
+            # Get all data from database
+            all_data = self.get_sample_data(sample_set_name, use_averages=use_averages)
+            if not all_data:
+                self.logger.warning(f"No data found for {sample_set_name}")
                 return False
+            
+            # Get existing DataIDs from the file
+            existing_dataids = self._get_existing_dataids_from_file(file_path)
+            
+            # Filter out data that already exists in the file
+            new_data = []
+            for data_row in all_data:
+                if data_row['DataID'] not in existing_dataids:
+                    new_data.append(data_row)
+            
+            if not new_data:
+                self.logger.info(f"No new data to append for {sample_set_name} - all data already exists in file")
+                return True  # Not an error, just nothing new to add
+            
+            self.logger.info(f"Found {len(new_data)} new data points to append (out of {len(all_data)} total)")
             
             # Create backup
             backup_path = f"{file_path}.backup_{int(time.time())}"
@@ -376,10 +418,10 @@ class DirectPlot3DExporter:
             # Find the next empty row to start appending
             start_append_row = self._find_next_empty_row(sheet, start_row_idx=7)
             
-            self.logger.info(f"Appending {len(data)} rows starting at row {start_append_row + 1}")
+            self.logger.info(f"Appending {len(new_data)} rows starting at row {start_append_row + 1}")
             
             # Append new data without disturbing existing data
-            for row_offset, data_row in enumerate(data):
+            for row_offset, data_row in enumerate(new_data):
                 sheet_row_idx = start_append_row + row_offset
                 
                 # Only set the first 4 columns (A-D), preserving any existing data in columns E-M
@@ -402,7 +444,7 @@ class DirectPlot3DExporter:
             except Exception:
                 pass  # Keep backup if cleanup fails
             
-            self.logger.info(f"Successfully appended {len(data)} rows to {file_path} starting at row {start_append_row + 1}")
+            self.logger.info(f"Successfully appended {len(new_data)} rows to {file_path} starting at row {start_append_row + 1}")
             return True
             
         except Exception as e:
